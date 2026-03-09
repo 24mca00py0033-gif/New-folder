@@ -1,17 +1,15 @@
 """
-Main entry point for the AI Multi-Agent Misinformation System.
-Run this file to launch the Gradio web interface.
+Main entry point — Graph-Based Multi-Agent Misinformation Simulation System
+============================================================================
+Launches the Gradio web interface.
 
 Usage:
     python main.py
-    
-Or run the app directly:
-    python app.py
+    python app.py          (alternative)
 """
 import sys
 import os
 
-# Add project root to path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
@@ -28,58 +26,43 @@ def check_dependencies():
         "numpy": "numpy",
         "PIL": "Pillow",
     }
-
     missing = []
     for module, package in required.items():
         try:
             __import__(module)
         except ImportError:
             missing.append(package)
-
     if missing:
-        print("❌ Missing dependencies detected!")
-        print(f"   Run: pip install {' '.join(missing)}")
-        print(f"   Or:  pip install -r requirements.txt")
+        print("❌ Missing dependencies:")
+        print(f"   pip install {' '.join(missing)}")
         return False
-
     print("✅ All dependencies satisfied.")
     return True
 
 
 def check_api_key():
-    """Check if Groq API key is configured."""
     from config import GROQ_API_KEY
     if GROQ_API_KEY:
-        print(f"✅ Groq API key configured (starts with: {GROQ_API_KEY[:8]}...)")
-        return True
+        print(f"✅ Groq API key set (starts with {GROQ_API_KEY[:8]}…)")
     else:
-        print("⚠️  Groq API key not set in environment.")
-        print("   You can enter it in the Gradio UI or set GROQ_API_KEY environment variable.")
-        print("   Get your free key at: https://console.groq.com")
-        return True  # Allow running without key (can enter in UI)
+        print("⚠️  GROQ_API_KEY not set — enter it in the UI or export as env var.")
 
 
 def main():
-    """Launch the application."""
     print("=" * 60)
-    print("  AI Multi-Agent Misinformation Simulation System")
-    print("  MCA Final Year Project")
+    print("  Graph-Based Multi-Agent Misinformation Simulation System")
     print("=" * 60)
     print()
 
-    # Check dependencies
     if not check_dependencies():
         sys.exit(1)
 
-    # Check API key
     check_api_key()
-
     print()
-    print("🚀 Launching Gradio interface...")
+    print("🚀 Launching Gradio interface …")
     print("   Open http://localhost:7860 in your browser")
     print()
 
-    # Import and launch
     from app import create_ui, GRADIO_THEME, CUSTOM_CSS
     app = create_ui()
     app.launch(

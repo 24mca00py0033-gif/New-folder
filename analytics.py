@@ -1,253 +1,158 @@
 """
 Analytics Module
-Provides comprehensive analytical capabilities for the misinformation simulation.
-Covers: Spread Velocity, Verification Impact, Agent Influence, Moderation Effectiveness.
+================
+Comprehensive analytics for the multi-cascade misinformation simulation.
+Computes spread velocity, verification impact, agent influence,
+moderation effectiveness, and generates a formatted report.
 """
 import numpy as np
-import matplotlib
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-import networkx as nx
 
 
 class SimulationAnalytics:
     """
-    Generates detailed analytics and visualizations for simulation results.
+    Produces detailed analytics from a completed simulation state
+    (as returned by MisinformationPipeline.run_simulation()).
     """
 
     def __init__(self, network):
         self.network = network
 
-    def compute_spread_metrics(self, spread_data):
-        """
-        Compute detailed spread velocity metrics.
-        """
-        spread_per_step = spread_data.get("spread_per_step", [])
-        total_reached = spread_data.get("total_reached", 0)
+    # ── metric groups ─────────────────────────────────────────────────────────
+
+    def compute_spread_metrics(self, spread: dict) -> dict:
+        steps = spread.get("spread_per_step", [])
+        total_reached = spread.get("total_reached", 0)
         total_nodes = self.network.num_nodes
-
-        cumulative = list(np.cumsum(spread_per_step)) if spread_per_step else [0]
-
-        # Average spread velocity (nodes per BFS level)
-        avg_velocity = np.mean(spread_per_step) if spread_per_step else 0
-
-        # Peak spread step
-        peak_step = (np.argmax(spread_per_step) + 1) if spread_per_step else 0
-        peak_spread = max(spread_per_step) if spread_per_step else 0
-
+        cumulative = list(np.cumsum(steps)) if steps else [0]
         return {
             "total_reached": total_reached,
             "total_nodes": total_nodes,
-            "penetration_rate": round(total_reached / total_nodes * 100, 2),
-            "spread_per_step": spread_per_step,
+            "penetration_rate": round(total_reached / max(total_nodes, 1) * 100, 2),
+            "spread_per_step": steps,
             "cumulative_spread": cumulative,
-            "avg_velocity": round(avg_velocity, 2),
-            "peak_step": peak_step,
-            "peak_spread_count": peak_spread,
-            "max_depth": spread_data.get("max_depth_reached", 0),
-            "viral_coefficient": spread_data.get("viral_coefficient", 0),
+            "avg_velocity": round(float(np.mean(steps)), 2) if steps else 0,
+            "peak_step": (int(np.argmax(steps)) + 1) if steps else 0,
+            "peak_spread_count": int(max(steps)) if steps else 0,
+            "max_depth": spread.get("max_depth_reached", 0),
+            "viral_coefficient": spread.get("viral_coefficient", 0),
+            "num_cascades": spread.get("num_cascades", 0),
         }
 
-    def compute_verification_impact(self, spread_data, verification_data, moderation_data):
-        """
-        Compute the impact of verification on spread containment.
-        """
-        verdict = verification_data.get("verdict", "Unverified")
-        confidence = verification_data.get("confidence", 0.5)
-        decision = moderation_data.get("decision", "FLAG")
-
-        total_reached = spread_data.get("total_reached", 0)
+    def compute_containment_metrics(self, spread: dict) -> dict:
+        total_reached = spread.get("total_reached", 0)
+        total_blocked = spread.get("total_blocked", 0)
+        total_warned = spread.get("total_warned", 0)
         total_nodes = self.network.num_nodes
-
-        # Simulate post-verification metrics
-        if verdict == "Fake" and decision == "BLOCK":
-            post_verification_spread = 0
-            containment = "Complete"
-            reduction_rate = 100.0
-        elif verdict == "Unverified" or decision == "FLAG":
-            post_verification_spread = max(1, total_reached // 4)
-            containment = "Partial"
-            reduction_rate = 50.0
-        else:
-            post_verification_spread = total_reached
-            containment = "None"
-            reduction_rate = 0.0
-
-        protected_nodes = total_nodes - total_reached - post_verification_spread
-        protected_nodes = max(0, protected_nodes)
-
+        protected = total_nodes - total_reached
+        containment_rate = round(
+            (total_blocked + total_warned) / max(total_reached, 1) * 100, 1
+        )
         return {
-            "verdict": verdict,
-            "confidence": confidence,
-            "pre_verification_spread": total_reached,
-            "post_verification_spread": post_verification_spread,
-            "containment_type": containment,
-            "spread_reduction_rate": reduction_rate,
-            "protected_nodes": protected_nodes,
-            "network_immunization_rate": round(protected_nodes / total_nodes * 100, 2),
-        }
-
-    def compute_agent_influence(self, spread_data, verification_data, influencer_data, moderation_data):
-        """
-        Compute which agent had the most influence on the simulation outcome.
-        """
-        total_reached = spread_data.get("total_reached", 0)
-        total_nodes = self.network.num_nodes
-        confidence = verification_data.get("confidence", 0.5)
-        amp_score = influencer_data.get("amplification_score", 5.0)
-        containment_rate = moderation_data.get("spread_impact", {}).get("containment_rate", 0)
-
-        # Agent impact scores (normalized 0-10)
-        scores = {
-            "Misinformation Agent": 5.0,  # Baseline content creator
-            "Neutral Agent (Spreader)": min(10.0, (total_reached / max(total_nodes * 0.1, 1)) * 2),
-            "Fact-Checker Agent": confidence * 8.0,
-            "Influencer Agent": amp_score,
-            "Moderator Agent": (containment_rate / 100.0) * 10.0,
-        }
-
-        # Determine most influential agent
-        most_influential = max(scores, key=scores.get)
-
-        # Network centrality of spread path
-        spread_path = spread_data.get("spread_path", [])
-        most_central_node = None
-        if spread_path and len(spread_path) > 1:
-            subgraph = self.network.graph.subgraph(spread_path)
-            if subgraph.number_of_nodes() > 1:
-                centrality = nx.betweenness_centrality(subgraph)
-                most_central_node = max(centrality, key=centrality.get)
-
-        return {
-            "agent_scores": scores,
-            "most_influential_agent": most_influential,
-            "most_influential_score": scores[most_influential],
-            "most_central_node": most_central_node,
-            "amplification_score": amp_score,
-        }
-
-    def compute_moderation_effectiveness(self, verification_data, moderation_data, spread_data):
-        """
-        Compute moderation effectiveness metrics.
-        """
-        verdict = verification_data.get("verdict", "Unverified")
-        decision = moderation_data.get("decision", "FLAG")
-        total_reached = spread_data.get("total_reached", 0)
-        total_nodes = self.network.num_nodes
-
-        # Determine if moderation was correct
-        if verdict == "Fake" and decision in ["BLOCK", "FLAG"]:
-            correct_decision = True
-            decision_type = "True Positive"
-        elif verdict == "Real" and decision == "ALLOW":
-            correct_decision = True
-            decision_type = "True Negative"
-        elif verdict == "Real" and decision in ["BLOCK", "FLAG"]:
-            correct_decision = False
-            decision_type = "False Positive"
-        elif verdict == "Fake" and decision == "ALLOW":
-            correct_decision = False
-            decision_type = "False Negative"
-        else:
-            correct_decision = True
-            decision_type = "Cautionary (Unverified→Flag)"
-
-        # Calculate containment completeness
-        impact = moderation_data.get("spread_impact", {})
-        containment_rate = impact.get("containment_rate", 0)
-
-        return {
-            "decision": decision,
-            "verdict": verdict,
-            "correct_decision": correct_decision,
-            "decision_type": decision_type,
+            "total_blocked": total_blocked,
+            "total_warned": total_warned,
+            "protected_nodes": protected,
             "containment_rate": containment_rate,
-            "nodes_protected": int(total_nodes * containment_rate / 100),
-            "exposure_reduction": f"{containment_rate:.0f}%",
-            "severity": moderation_data.get("severity", "MEDIUM"),
+            "network_immunization_rate": round(protected / max(total_nodes, 1) * 100, 2),
         }
 
-    def generate_full_analytics(self, state):
-        """
-        Generate complete analytics from the simulation state.
-        Returns a comprehensive analytics dict.
-        """
-        spread = state.get("spread_data", {})
-        verification = state.get("verification_data", {})
-        influencer = state.get("influencer_data", {})
-        moderation = state.get("moderation_data", {})
+    def compute_verification_summary(self, verdicts: list) -> dict:
+        counts = {"Fake": 0, "Real": 0, "Unverified": 0}
+        total_conf = 0.0
+        for v in verdicts:
+            vd = v.get("verdict", "Unverified")
+            counts[vd] = counts.get(vd, 0) + 1
+            total_conf += v.get("confidence", 0.5)
+        avg_conf = total_conf / max(len(verdicts), 1)
+        return {
+            "verdict_counts": counts,
+            "avg_confidence": round(avg_conf, 2),
+            "total_claims": len(verdicts),
+        }
 
-        spread_metrics = self.compute_spread_metrics(spread)
-        verification_impact = self.compute_verification_impact(spread, verification, moderation)
-        agent_influence = self.compute_agent_influence(spread, verification, influencer, moderation)
-        moderation_effectiveness = self.compute_moderation_effectiveness(verification, moderation, spread)
+    def compute_moderation_summary(self, mod_results: list) -> dict:
+        counts = {"BLOCK": 0, "FLAG": 0, "ALLOW": 0}
+        for m in mod_results:
+            d = m.get("decision", "FLAG")
+            counts[d] = counts.get(d, 0) + 1
+        return {"decision_counts": counts}
+
+    def compute_influencer_summary(self, inf_results: list) -> dict:
+        scores = [r.get("amplification_score", 5.0) for r in inf_results]
+        return {
+            "avg_amplification": round(float(np.mean(scores)), 1) if scores else 0,
+            "max_amplification": round(float(max(scores)), 1) if scores else 0,
+            "counter_messages": sum(
+                1 for r in inf_results if r.get("action_type") == "counter_messaging"
+            ),
+            "amplifications": sum(
+                1 for r in inf_results if r.get("action_type") == "amplification"
+            ),
+        }
+
+    # ── aggregate ─────────────────────────────────────────────────────────────
+
+    def generate_full_analytics(self, state: dict) -> dict:
+        spread = state.get("spread_result", {})
+        verdicts = state.get("verification_results", [])
+        inf_results = state.get("influencer_results", [])
+        mod_results = state.get("moderation_results", [])
 
         return {
-            "spread_metrics": spread_metrics,
-            "verification_impact": verification_impact,
-            "agent_influence": agent_influence,
-            "moderation_effectiveness": moderation_effectiveness,
+            "spread_metrics": self.compute_spread_metrics(spread),
+            "containment": self.compute_containment_metrics(spread),
+            "verification": self.compute_verification_summary(verdicts),
+            "moderation": self.compute_moderation_summary(mod_results),
+            "influencer": self.compute_influencer_summary(inf_results),
         }
 
-    def generate_analytics_report(self, full_analytics):
-        """
-        Format analytics into a detailed text report.
-        """
-        sm = full_analytics["spread_metrics"]
-        vi = full_analytics["verification_impact"]
-        ai = full_analytics["agent_influence"]
-        me = full_analytics["moderation_effectiveness"]
+    # ── formatted report ──────────────────────────────────────────────────────
 
-        report = f"""
+    def generate_analytics_report(self, full: dict) -> str:
+        sm = full["spread_metrics"]
+        ct = full["containment"]
+        vr = full["verification"]
+        md = full["moderation"]
+        inf = full["influencer"]
+
+        return f"""
 {'='*60}
           DETAILED ANALYTICS REPORT
 {'='*60}
 
-📈 1. SPREAD VELOCITY ANALYSIS
+📈 1. SPREAD VELOCITY
 {'─'*60}
-   Total Nodes Reached    : {sm['total_reached']} / {sm['total_nodes']}
-   Network Penetration    : {sm['penetration_rate']}%
-   Average Velocity       : {sm['avg_velocity']} nodes/step
-   Peak Spread Step       : Step {sm['peak_step']} ({sm['peak_spread_count']} nodes)
-   Maximum Depth          : {sm['max_depth']} hops
-   Viral Coefficient      : {sm['viral_coefficient']}
-   Nodes Per Step         : {sm['spread_per_step']}
+   Cascades Launched    : {sm['num_cascades']}
+   Total Nodes Reached  : {sm['total_reached']} / {sm['total_nodes']}
+   Network Penetration  : {sm['penetration_rate']}%
+   Average Velocity     : {sm['avg_velocity']} nodes/step
+   Peak Spread Step     : Step {sm['peak_step']} ({sm['peak_spread_count']} nodes)
+   Maximum Depth        : {sm['max_depth']} hops
+   Viral Coefficient    : {sm['viral_coefficient']}
 
-🔍 2. VERIFICATION IMPACT
+🔍 2. FACT-CHECK IMPACT
 {'─'*60}
-   Verdict                : {vi['verdict']}
-   Confidence             : {vi['confidence']*100:.0f}%
-   Pre-Verification Spread: {vi['pre_verification_spread']} nodes
-   Post-Verification Spread: {vi['post_verification_spread']} nodes
-   Containment Type       : {vi['containment_type']}
-   Spread Reduction       : {vi['spread_reduction_rate']}%
-   Protected Nodes        : {vi['protected_nodes']}
-   Network Immunization   : {vi['network_immunization_rate']}%
+   Claims Analysed      : {vr['total_claims']}
+   Verdicts — Fake      : {vr['verdict_counts'].get('Fake',0)}
+              Real      : {vr['verdict_counts'].get('Real',0)}
+              Unverified: {vr['verdict_counts'].get('Unverified',0)}
+   Avg Confidence       : {vr['avg_confidence']*100:.0f}%
 
-🤖 3. AGENT INFLUENCE RANKING
+📣 3. INFLUENCER IMPACT
 {'─'*60}
-   Most Influential Agent : {ai['most_influential_agent']}
-   Most Central Node      : User_{ai['most_central_node']}
-   Amplification Score    : {ai['amplification_score']}/10
+   Avg Amplification    : {inf['avg_amplification']}/10
+   Max Amplification    : {inf['max_amplification']}/10
+   Counter-Messages     : {inf['counter_messages']}
+   Amplifications       : {inf['amplifications']}
 
-   Agent Scores:"""
-
-        for agent, score in ai["agent_scores"].items():
-            bar = "█" * int(score) + "░" * (10 - int(score))
-            report += f"\n   {agent:28s} [{bar}] {score:.1f}/10"
-
-        report += f"""
-
-🛡️ 4. MODERATION EFFECTIVENESS
+🛡️ 4. MODERATION & CONTAINMENT
 {'─'*60}
-   Decision               : {me['decision']}
-   Verdict Match          : {me['decision_type']}
-   Correct Decision       : {'✅ Yes' if me['correct_decision'] else '❌ No'}
-   Containment Rate       : {me['containment_rate']:.0f}%
-   Nodes Protected        : {me['nodes_protected']}
-   Exposure Reduction     : {me['exposure_reduction']}
-   Severity Level         : {me['severity']}
+   Decisions — BLOCK    : {md['decision_counts'].get('BLOCK',0)}
+               FLAG     : {md['decision_counts'].get('FLAG',0)}
+               ALLOW    : {md['decision_counts'].get('ALLOW',0)}
+   Nodes Blocked (BFS)  : {ct['total_blocked']}
+   Nodes Warned  (BFS)  : {ct['total_warned']}
+   Protected Nodes      : {ct['protected_nodes']}
+   Containment Rate     : {ct['containment_rate']}%
+   Immunisation Rate    : {ct['network_immunization_rate']}%
 
 {'='*60}"""
-
-        return report

@@ -1,47 +1,66 @@
 """
-Configuration for the AI Multi-Agent Misinformation System.
+Configuration for the Graph-Based Multi-Agent Misinformation Simulation System.
+All tuneable parameters live here so every module stays in sync.
 """
 import os
 
 # ─── Groq API Configuration ───────────────────────────────────────────────────
-GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")  # Set your Groq API key here or via env var
-GROQ_MODEL = "llama-3.3-70b-versatile"  # Groq model to use
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
+GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # ─── Social Network Configuration ─────────────────────────────────────────────
-NETWORK_NUM_NODES = 100          # Number of nodes in the social network
-NETWORK_EDGES_PER_NODE = 3       # Edges per new node (Barabási-Albert model)
-NETWORK_SEED = 42                # Random seed for reproducibility
+NETWORK_NUM_NODES = 1000         # Nodes in the Barabási-Albert graph
+NETWORK_EDGES_PER_NODE = 3       # m parameter (edges per new node)
+NETWORK_SEED = 42                # Reproducibility seed
 
-# ─── Agent Configuration ──────────────────────────────────────────────────────
-MAX_SPREAD_DEPTH = 50             # Max BFS depth for neutral agent spread
-SPREAD_PROBABILITY = 0.6         # Probability a neutral node reshares content
-INFLUENCER_THRESHOLD = 10        # Min degree for a node to be an influencer
+# ─── Agent Role Counts (embedded inside the graph) ────────────────────────────
+NUM_MISINFO_AGENTS = 7           # Misinformation source nodes (5-10)
+NUM_INFLUENCERS = 15             # Influencer amplifier nodes
+NUM_FACT_CHECKERS = 20           # Fact-checker verifier nodes
+NUM_MODERATORS = 25              # Moderator gatekeeper nodes
+# Remaining nodes → normal users
 
-# ─── Agent Role Counts (Configurable) ─────────────────────────────────────────
-NUM_INFLUENCERS = 25              # Number of influencer nodes in the network
-NUM_FACT_CHECKERS = 35            # Number of fact-checker nodes in the network
-NUM_MODERATORS = 50               # Number of moderator nodes in the network
+# ─── Propagation Parameters ──────────────────────────────────────────────────
+SPREAD_PROBABILITY = 0.35        # Base reshare probability for normal users
+AMPLIFICATION_FACTOR = 3.0       # Influencers spread to N× more neighbours
+MAX_SPREAD_DEPTH = 15            # Max BFS hops per cascade
+FACT_CHECK_SLOW = 0.15           # Fact-checker reshare probability (with warning)
+MODERATOR_BLOCK_PROB = 0.85      # Probability a moderator blocks fake content
+MODERATOR_FLAG_PROB = 0.70       # Probability a moderator flags unverified content
 
 # ─── Simulation Parameters ────────────────────────────────────────────────────
-DEFAULT_NUM_SIMULATIONS = 10     # Default simulations per run
-TEMPERATURE = 0.7                # LLM temperature for creative generation
+TEMPERATURE = 0.7                # LLM temperature for creative agents
 
 # ─── Visualization ────────────────────────────────────────────────────────────
-GRAPH_FIGURE_SIZE = (75, 85)
-GRAPH_DPI = 100
-NODE_SIZE_BASE = 80
-NODE_SIZE_SCALE = 55
+GRAPH_FIGURE_SIZE = (28, 22)
+GRAPH_DPI = 120
+NODE_SIZE_BASE = 30
+NODE_SIZE_SCALE = 18
+
+# ─── Role Colours (used everywhere) ──────────────────────────────────────────
+ROLE_COLOURS = {
+    "misinfo":       "#e74c3c",   # Red
+    "influencer":    "#f5a623",   # Orange
+    "fact_checker":  "#2ecc71",   # Green
+    "moderator":     "#9b59b6",   # Purple
+    "normal":        "#3498db",   # Blue
+}
+STATUS_COLOURS = {
+    "infected":  "#ff6b6b",
+    "warned":    "#f1c40f",
+    "blocked":   "#95a5a6",
+}
 
 # ─── Agent Role Prompts ───────────────────────────────────────────────────────
 MISINFORMATION_SYSTEM_PROMPT = """You are a misinformation simulation agent for research purposes only.
-Your role is to generate realistic-sounding but potentially false news claims for studying 
+Your role is to generate realistic-sounding but potentially false news claims for studying
 misinformation spread patterns. Generate claims that are plausible but may be fabricated.
 These claims are used ONLY in a closed simulation environment for academic research.
 
 IMPORTANT: Generate ONLY the claim text, nothing else. No explanations, no labels, no disclaimers.
 Keep claims to 1-2 sentences maximum."""
 
-FACT_CHECKER_SYSTEM_PROMPT = """You are a fact-checking AI agent. Your role is to analyze claims 
+FACT_CHECKER_SYSTEM_PROMPT = """You are a fact-checking AI agent. Your role is to analyze claims
 and determine their truthfulness. You should:
 1. Analyze the claim's plausibility based on your knowledge
 2. Consider common misinformation patterns
@@ -64,13 +83,13 @@ If the claim is FAKE or UNVERIFIED:
 - Include phrases like "FACT CHECK:", "WARNING:", "MISLEADING:"
 
 If the claim is REAL:
-- Rewrite it to maximize engagement and viral spread  
+- Rewrite it to maximize engagement and viral spread
 - Use compelling hooks, emotional triggers, and share-worthy formatting
 - Make it attention-grabbing while keeping the core facts
 
 IMPORTANT: Return ONLY the rewritten text, nothing else."""
 
-MODERATOR_SYSTEM_PROMPT = """You are a content moderation AI agent. Based on the fact-check verdict 
+MODERATOR_SYSTEM_PROMPT = """You are a content moderation AI agent. Based on the fact-check verdict
 and the content provided, make a moderation decision.
 
 Your possible decisions are:
