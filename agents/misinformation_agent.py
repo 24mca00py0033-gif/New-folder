@@ -1,11 +1,11 @@
 """
 Misinformation Agent
 ====================
-Generates realistic fake news claims using Groq LLM.
-Supports batch generation for multiple misinformation-source nodes.
+Generates a single realistic misinformation claim using Groq LLM.
+This agent represents the source of fake news in the social network.
+It injects exactly ONE claim into the network via the misinfo source node.
 """
 import random
-import json
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 from config import GROQ_API_KEY, GROQ_MODEL, MISINFORMATION_SYSTEM_PROMPT, TEMPERATURE
@@ -13,9 +13,9 @@ from config import GROQ_API_KEY, GROQ_MODEL, MISINFORMATION_SYSTEM_PROMPT, TEMPE
 
 class MisinformationAgent:
     """
-    Generates realistic misinformation claims.
-    Each misinformation-source node in the graph calls *generate_claim*
-    to produce its unique claim before the cascade starts.
+    Generates a single misinformation claim using Groq LLM.
+    The claim is injected into the misinfo source node in the graph
+    to kick off the simulation cascade.
     """
 
     TOPICS = [
@@ -23,19 +23,6 @@ class MisinformationAgent:
         "environment", "education", "economy", "science",
         "social media", "international relations", "public safety",
         "artificial intelligence", "climate change", "cybersecurity",
-    ]
-
-    FALLBACK_CLAIMS = [
-        "Breaking: Government announces free 5G internet for all students starting January 2026.",
-        "Scientists discover high-frequency Wi-Fi signals can accelerate plant growth by 300%.",
-        "New study reveals that drinking cold water after a meal causes cancer, says WHO.",
-        "Central bank to replace all physical currency with blockchain tokens by 2027.",
-        "Leaked documents show top social media platform secretly sells user DNA data.",
-        "NASA confirms a second moon has been captured by Earth's gravitational field.",
-        "Major airline found injecting sleeping agents into cabin air on long-haul flights.",
-        "World Health Organization declares coffee a controlled substance due to new research.",
-        "Government plans to monitor all private messages for national security starting next month.",
-        "Researchers claim 5G towers are responsible for a 40% decline in bee populations.",
     ]
 
     def __init__(self):
@@ -51,8 +38,8 @@ class MisinformationAgent:
             except Exception:
                 self.llm = None
 
-    def generate_claim(self, topic=None):
-        """Generate a single realistic misinformation claim."""
+    def generate_claim(self, topic=None) -> dict:
+        """Generate a single misinformation claim using the LLM."""
         topic = topic or random.choice(self.TOPICS)
 
         if self.llm:
@@ -72,39 +59,43 @@ class MisinformationAgent:
                     "claim": claim_text,
                     "source_agent": "MisinformationAgent",
                     "topic": topic,
-                    "generated": True,
+                    "generated_by": "LLM",
                 }
             except Exception as e:
-                pass  # fall through to fallback
+                return {
+                    "claim": f"[LLM Error: {str(e)[:80]}] — Unable to generate claim. Check your GROQ_API_KEY in .env file.",
+                    "source_agent": "MisinformationAgent",
+                    "topic": topic,
+                    "generated_by": "error",
+                }
+        else:
+            return {
+                "claim": "⚠️ No GROQ_API_KEY found. Please set your API key in the .env file to generate claims.",
+                "source_agent": "MisinformationAgent",
+                "topic": topic,
+                "generated_by": "error",
+            }
 
-        # Fallback
-        claim_text = random.choice(self.FALLBACK_CLAIMS)
+    def inject_into_graph(self, network, claim: dict) -> dict:
+        """Inject the claim into the misinfo source node in the graph."""
+        misinfo_nodes = network.get_misinfo_nodes()
+        if not misinfo_nodes:
+            return {"success": False, "error": "No misinfo source node found in graph"}
+
+        src_node = misinfo_nodes[0]  # Always use first misinfo node (single source)
+        G = network.graph
+
+        # Mark the source node as infected
+        G.nodes[src_node]["status"] = "infected"
+        G.nodes[src_node]["shared"] = True
+        G.nodes[src_node]["infection_time"] = 0
+        G.nodes[src_node]["claim_text"] = claim["claim"]
+
         return {
-            "claim": claim_text,
-            "source_agent": "MisinformationAgent",
-            "topic": topic,
-            "generated": False,
+            "success": True,
+            "source_node": src_node,
+            "source_label": G.nodes[src_node]["label"],
+            "claim": claim["claim"],
+            "topic": claim.get("topic", ""),
+            "degree": G.degree(src_node),
         }
-
-    def generate_batch(self, count: int) -> list[dict]:
-        """
-        Generate *count* unique misinformation claims using diverse topics.
-        Each misinformation-source node in the graph gets one.
-        """
-        topics = random.sample(self.TOPICS, min(count, len(self.TOPICS)))
-        while len(topics) < count:
-            topics.append(random.choice(self.TOPICS))
-
-        claims = []
-        used_fallbacks = set()
-        for topic in topics:
-            claim = self.generate_claim(topic)
-            # ensure fallback claims are unique
-            if not claim["generated"]:
-                attempts = 0
-                while claim["claim"] in used_fallbacks and attempts < 20:
-                    claim = self.generate_claim(topic)
-                    attempts += 1
-                used_fallbacks.add(claim["claim"])
-            claims.append(claim)
-        return claims

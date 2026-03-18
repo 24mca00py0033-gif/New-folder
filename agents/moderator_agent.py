@@ -1,10 +1,9 @@
 """
 Moderator Agent
 ===============
-Makes BLOCK / FLAG / ALLOW decisions using LLM policy reasoning.
-During the BFS cascade, moderator nodes probabilistically block or flag
-content (handled in social_network.py). This class provides the detailed
-LLM-based analysis run *after* the cascade by the pipeline for reporting.
+After fact-checking, moderator nodes take action on infected/influenced nodes.
+Based on the fact-checker verdict, moderators can BLOCK, FLAG, or ALLOW content.
+This is the final agent phase that stops or reduces misinformation spread.
 """
 import json
 from langchain_groq import ChatGroq
@@ -14,8 +13,9 @@ from config import GROQ_API_KEY, GROQ_MODEL, MODERATOR_SYSTEM_PROMPT, TEMPERATUR
 
 class ModeratorAgent:
     """
-    Content-moderation agent.  Produces per-claim moderation verdicts
-    with severity and reasoning.
+    Moderator nodes take action on the network based on fact-checker results.
+    They can BLOCK (stop spread), FLAG (warn users), or ALLOW content.
+    Each moderator scans its neighbourhood and applies its decision.
     """
 
     def __init__(self):
@@ -31,32 +31,91 @@ class ModeratorAgent:
             except Exception:
                 self.llm = None
 
-    def moderate_content(
-        self,
-        claim_text: str,
-        verdict: str,
-        confidence: float,
-        evidence: str = "",
-        rewritten_content: str = "",
-        spread_data: dict | None = None,
-    ) -> dict:
-        """Return a moderation decision dict for one claim."""
-        spread_info = ""
-        if spread_data:
-            spread_info = (
-                f"\nSPREAD DATA:\n"
-                f"- Nodes Reached: {spread_data.get('total_reached', '?')}\n"
-                f"- Penetration: {spread_data.get('penetration_rate', '?')}%\n"
-            )
+    def moderate_graph(self, network, fact_check_result: dict) -> dict:
+        """
+        Moderator nodes take action on the graph based on fact-checker results.
+        They scan their neighbourhoods and apply moderation decisions.
+        """
+        G = network.graph
+        mod_nodes = network.get_moderator_nodes()
 
-        if self.llm:
+        claim_text = fact_check_result.get("claim", "")
+        verdict = fact_check_result.get("verdict", "Unverified")
+        confidence = fact_check_result.get("confidence", 0.5)
+        evidence = fact_check_result.get("evidence", "")
+
+        # Get LLM moderation decision
+        decision_result = self._make_decision(claim_text, verdict, confidence, evidence)
+
+        # Apply moderation to graph
+        nodes_blocked = 0
+        nodes_flagged = 0
+        nodes_allowed = 0
+        blocked_node_ids = []
+        flagged_node_ids = []
+        active_moderators = 0
+
+        for mod_node in mod_nodes:
+            # Check if moderator is near infected content
+            neighbours_infected = [
+                nb for nb in G.neighbors(mod_node)
+                if G.nodes[nb]["status"] in ("infected", "influenced")
+            ]
+
+            if not neighbours_infected and G.nodes[mod_node]["exposure_count"] == 0:
+                continue
+
+            active_moderators += 1
+            G.nodes[mod_node]["status"] = "warned"  # Moderator is aware
+
+            for nb in neighbours_infected:
+                if decision_result["decision"] == "BLOCK":
+                    G.nodes[nb]["status"] = "blocked"
+                    G.nodes[nb]["blocked_by"] = mod_node
+                    G.nodes[nb]["shared"] = False
+                    nodes_blocked += 1
+                    blocked_node_ids.append(nb)
+                elif decision_result["decision"] == "FLAG":
+                    if G.nodes[nb]["status"] != "blocked":  # Don't override block
+                        G.nodes[nb]["status"] = "warned"
+                        G.nodes[nb]["warning_label"] = True
+                        nodes_flagged += 1
+                        flagged_node_ids.append(nb)
+                else:  # ALLOW
+                    nodes_allowed += 1
+
+        # Count final node statuses across the entire graph
+        status_counts = {"clean": 0, "infected": 0, "influenced": 0, "warned": 0, "blocked": 0}
+        for n in G.nodes():
+            st = G.nodes[n]["status"]
+            status_counts[st] = status_counts.get(st, 0) + 1
+
+        return {
+            "success": True,
+            "decision": decision_result["decision"],
+            "reason": decision_result["reason"],
+            "severity": decision_result.get("severity", "MEDIUM"),
+            "action_taken": decision_result.get("action_taken", ""),
+            "nodes_blocked": nodes_blocked,
+            "nodes_flagged": nodes_flagged,
+            "nodes_allowed": nodes_allowed,
+            "blocked_node_ids": blocked_node_ids,
+            "flagged_node_ids": flagged_node_ids,
+            "active_moderators": active_moderators,
+            "total_moderators": len(mod_nodes),
+            "final_status_counts": status_counts,
+            "verdict_used": verdict,
+            "confidence_used": confidence,
+        }
+
+    def _make_decision(self, claim_text, verdict, confidence, evidence) -> dict:
+        """Make moderation decision using LLM or rules."""
+        if self.llm and claim_text:
             try:
                 prompt = (
                     f'ORIGINAL CLAIM: "{claim_text}"\n\n'
                     f"FACT-CHECK: Verdict={verdict}, Confidence={confidence*100:.0f}%\n"
-                    f"Evidence: {evidence}\n"
-                    f'{f"INFLUENCER VERSION: {rewritten_content}" if rewritten_content else ""}'
-                    f"{spread_info}\n"
+                    f"Evidence: {evidence}\n\n"
                     "Respond ONLY with valid JSON."
                 )
                 messages = [
@@ -64,36 +123,11 @@ class ModeratorAgent:
                     HumanMessage(content=prompt),
                 ]
                 response = self.llm.invoke(messages)
-                result = self._parse_decision(response.content, verdict, confidence)
+                return self._parse_decision(response.content, verdict, confidence)
             except Exception:
-                result = self._rule_based(verdict, confidence)
-        else:
-            result = self._rule_based(verdict, confidence)
+                pass
 
-        result.update({
-            "claim": claim_text,
-            "verdict_used": verdict,
-            "confidence_used": confidence,
-            "source_agent": "ModeratorAgent",
-            "spread_impact": self._spread_impact(result["decision"], spread_data),
-        })
-        return result
-
-    def moderate_batch(self, claims, verdicts, influencer_results, spread_result):
-        """Moderate every claim."""
-        results = []
-        for cl, ver, inf in zip(claims, verdicts, influencer_results):
-            results.append(self.moderate_content(
-                claim_text=cl.get("claim", ""),
-                verdict=ver.get("verdict", "Unverified"),
-                confidence=ver.get("confidence", 0.5),
-                evidence=ver.get("evidence", ""),
-                rewritten_content=inf.get("rewritten_content", ""),
-                spread_data=spread_result,
-            ))
-        return results
-
-    # ── internal helpers ──────────────────────────────────────────────────────
+        return self._rule_based(verdict, confidence)
 
     @staticmethod
     def _parse_decision(response_text, verdict, confidence):
@@ -135,31 +169,23 @@ class ModeratorAgent:
                 "action_taken": "Content allowed to spread."}
 
     @staticmethod
-    def _spread_impact(decision, spread_data):
-        reached = (spread_data or {}).get("total_reached", 0)
-        if decision == "BLOCK":
-            return {"containment": "COMPLETE", "containment_rate": 100.0,
-                    "additional_spread": 0,
-                    "description": "All further spread halted."}
-        if decision == "FLAG":
-            return {"containment": "PARTIAL", "containment_rate": 50.0,
-                    "additional_spread": max(1, reached // 4),
-                    "description": "Spread reduced by ~50 %."}
-        return {"containment": "NONE", "containment_rate": 0.0,
-                "additional_spread": reached,
-                "description": "Content spreads normally."}
-
-    @staticmethod
     def get_moderation_summary(result: dict) -> str:
         d_emoji = {"BLOCK": "🚫", "FLAG": "⚠️", "ALLOW": "✅"}.get(result["decision"], "❓")
         s_emoji = {"HIGH": "🔴", "MEDIUM": "🟡", "LOW": "🟢"}.get(result.get("severity", ""), "⚪")
-        imp = result.get("spread_impact", {})
+        sc = result.get("final_status_counts", {})
         return (
             f"\n🛡️ MODERATOR DECISION\n{'='*50}\n"
             f"{d_emoji} Decision : {result['decision']}\n"
             f"{s_emoji} Severity : {result.get('severity', 'N/A')}\n"
             f"📝 Reason  : {result['reason']}\n"
-            f"⚡ Action  : {result['action_taken']}\n"
-            f"🔒 Contain.: {imp.get('containment', 'N/A')} "
-            f"({imp.get('containment_rate', 0):.0f}%)\n"
+            f"⚡ Action  : {result.get('action_taken', '')}\n"
+            f"🚫 Blocked : {result.get('nodes_blocked', 0)} nodes\n"
+            f"⚠️ Flagged : {result.get('nodes_flagged', 0)} nodes\n"
+            f"✅ Allowed : {result.get('nodes_allowed', 0)} nodes\n"
+            f"👮 Active  : {result.get('active_moderators', 0)} / "
+            f"{result.get('total_moderators', 0)}\n\n"
+            f"📊 Final Graph Status:\n"
+            f"  Clean: {sc.get('clean', 0)} | Infected: {sc.get('infected', 0)} | "
+            f"Influenced: {sc.get('influenced', 0)} | Warned: {sc.get('warned', 0)} | "
+            f"Blocked: {sc.get('blocked', 0)}\n"
         )

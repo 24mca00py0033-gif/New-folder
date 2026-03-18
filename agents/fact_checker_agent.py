@@ -1,10 +1,9 @@
 """
 Fact-Checker Agent
 ==================
-Verifies claims using LLM reasoning. During the BFS cascade, fact-checker
-nodes inside the graph automatically slow spread and attach warnings.
-This class provides the detailed LLM-based analysis that the pipeline
-runs *after* the cascade to produce a human-readable report for every claim.
+After influencer amplification, fact-checker nodes scan the graph
+for infected/influenced nodes and verify the claim using LLM.
+They attach warning labels to nodes they check.
 """
 import json
 import random
@@ -15,8 +14,9 @@ from config import GROQ_API_KEY, GROQ_MODEL, FACT_CHECKER_SYSTEM_PROMPT, TEMPERA
 
 class FactCheckerAgent:
     """
-    Analyses a claim with the Groq LLM and returns a structured verdict.
-    Called once per cascade by the pipeline to produce analysis reports.
+    Fact-checker nodes in the graph verify the circulating claim.
+    They scan their neighbourhoods for infected/influenced nodes,
+    verify the claim using LLM, and attach warning labels.
     """
 
     def __init__(self):
@@ -32,8 +32,78 @@ class FactCheckerAgent:
             except Exception:
                 self.llm = None
 
+    def check_graph(self, network) -> dict:
+        """
+        Fact-checker nodes scan the graph, verify the claim,
+        and attach warnings to infected nodes in their neighbourhood.
+        """
+        G = network.graph
+        fc_nodes = network.get_fact_checker_nodes()
+
+        # Get the claim text from any infected node
+        claim_text = ""
+        for n in G.nodes():
+            if G.nodes[n].get("claim_text"):
+                claim_text = G.nodes[n]["claim_text"]
+                break
+
+        if not claim_text:
+            return {
+                "success": True,
+                "verdict": "Unverified",
+                "confidence": 0.0,
+                "nodes_checked": 0,
+                "nodes_warned": 0,
+                "evidence": "No claim found in the network",
+                "red_flags": [],
+                "active_checkers": 0,
+            }
+
+        # Verify the claim using LLM
+        verdict_result = self.verify_claim(claim_text)
+
+        # Fact-checker nodes scan their neighbourhoods
+        nodes_checked = 0
+        nodes_warned = 0
+        warned_node_ids = []
+        active_checkers = 0
+
+        for fc_node in fc_nodes:
+            # Check if this fact-checker was exposed to the claim
+            if G.nodes[fc_node]["exposure_count"] > 0 or any(
+                G.nodes[nb]["status"] in ("infected", "influenced")
+                for nb in G.neighbors(fc_node)
+            ):
+                active_checkers += 1
+                G.nodes[fc_node]["status"] = "warned"
+                G.nodes[fc_node]["warning_label"] = True
+
+                # Scan neighbours and attach warnings
+                for nb in G.neighbors(fc_node):
+                    if G.nodes[nb]["status"] in ("infected", "influenced"):
+                        nodes_checked += 1
+                        if verdict_result["verdict"] in ("Fake", "Unverified"):
+                            G.nodes[nb]["warning_label"] = True
+                            G.nodes[nb]["status"] = "warned"
+                            nodes_warned += 1
+                            warned_node_ids.append(nb)
+
+        return {
+            "success": True,
+            "claim": claim_text,
+            "verdict": verdict_result["verdict"],
+            "confidence": verdict_result["confidence"],
+            "evidence": verdict_result["evidence"],
+            "red_flags": verdict_result.get("red_flags", []),
+            "nodes_checked": nodes_checked,
+            "nodes_warned": nodes_warned,
+            "warned_node_ids": warned_node_ids,
+            "active_checkers": active_checkers,
+            "total_fact_checkers": len(fc_nodes),
+        }
+
     def verify_claim(self, claim_text: str) -> dict:
-        """Verify a single claim; return structured verdict."""
+        """Verify a claim using LLM or rule-based fallback."""
         search_evidence = self._simulate_web_search(claim_text)
 
         if self.llm:
@@ -50,23 +120,14 @@ class FactCheckerAgent:
                 ]
                 response = self.llm.invoke(messages)
                 result = self._parse_verdict(response.content)
-                result.update({
-                    "claim": claim_text,
-                    "search_evidence": search_evidence,
-                    "source_agent": "FactCheckerAgent",
-                })
+                result["claim"] = claim_text
+                result["search_evidence"] = search_evidence
                 return result
             except Exception:
                 pass
 
         # Fallback rule-based
         return self._fallback_verdict(claim_text, search_evidence)
-
-    def verify_batch(self, claims: list[dict]) -> list[dict]:
-        """Verify every claim in a list."""
-        return [self.verify_claim(c.get("claim", "")) for c in claims]
-
-    # ── helpers ───────────────────────────────────────────────────────────────
 
     @staticmethod
     def _simulate_web_search(claim_text: str) -> str:
@@ -85,7 +146,6 @@ class FactCheckerAgent:
                 text = text.split("```json")[1].split("```")[0].strip()
             elif "```" in text:
                 text = text.split("```")[1].split("```")[0].strip()
-
             result = json.loads(text)
             verdict = result.get("verdict", "Unverified")
             if verdict not in ("Real", "Fake", "Unverified"):
@@ -113,7 +173,6 @@ class FactCheckerAgent:
 
     @staticmethod
     def _fallback_verdict(claim_text: str, evidence: str) -> dict:
-        """Simple heuristic when LLM is unavailable."""
         red_flags = []
         score = 0.5
         lower = claim_text.lower()
@@ -131,18 +190,20 @@ class FactCheckerAgent:
             "evidence": "Rule-based analysis (LLM unavailable). " + evidence,
             "red_flags": red_flags or ["No specific red flags detected"],
             "search_evidence": evidence,
-            "source_agent": "FactCheckerAgent",
         }
 
     @staticmethod
-    def get_verdict_summary(verdict_result: dict) -> str:
-        vr = verdict_result
-        emoji = {"Real": "✅", "Fake": "❌", "Unverified": "⚠️"}.get(vr["verdict"], "❓")
-        flags = "\n".join(f"  🚩 {f}" for f in vr.get("red_flags", []))
+    def get_verdict_summary(result: dict) -> str:
+        emoji = {"Real": "✅", "Fake": "❌", "Unverified": "⚠️"}.get(result["verdict"], "❓")
+        flags = "\n".join(f"  🚩 {f}" for f in result.get("red_flags", []))
         return (
             f"\n🔍 FACT-CHECK RESULTS\n{'='*50}\n"
-            f"{emoji} Verdict : {vr['verdict']}\n"
-            f"📊 Confidence: {vr['confidence']*100:.0f}%\n"
-            f"📝 Evidence  : {vr['evidence']}\n"
+            f"{emoji} Verdict : {result['verdict']}\n"
+            f"📊 Confidence: {result['confidence']*100:.0f}%\n"
+            f"📝 Evidence  : {result['evidence']}\n"
             f"🚩 Red Flags :\n{flags or '  None'}\n"
+            f"📋 Nodes Checked: {result.get('nodes_checked', 0)}\n"
+            f"⚠️ Nodes Warned : {result.get('nodes_warned', 0)}\n"
+            f"🔍 Active Checkers: {result.get('active_checkers', 0)} / "
+            f"{result.get('total_fact_checkers', 0)}\n"
         )

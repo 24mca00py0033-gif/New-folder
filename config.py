@@ -1,24 +1,41 @@
 """
 Configuration for the Graph-Based Multi-Agent Misinformation Simulation System.
 All tuneable parameters live here so every module stays in sync.
+Agent counts are auto-calculated based on graph size.
 """
 import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # ─── Groq API Configuration ───────────────────────────────────────────────────
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
 # ─── Social Network Configuration ─────────────────────────────────────────────
-NETWORK_NUM_NODES = 1000         # Nodes in the Barabási-Albert graph
+NETWORK_NUM_NODES = 100          # Default nodes (user can choose 100-1000)
 NETWORK_EDGES_PER_NODE = 3       # m parameter (edges per new node)
 NETWORK_SEED = 42                # Reproducibility seed
 
-# ─── Agent Role Counts (embedded inside the graph) ────────────────────────────
-NUM_MISINFO_AGENTS = 7           # Misinformation source nodes (5-10)
-NUM_INFLUENCERS = 15             # Influencer amplifier nodes
-NUM_FACT_CHECKERS = 20           # Fact-checker verifier nodes
-NUM_MODERATORS = 25              # Moderator gatekeeper nodes
+# ─── Agent Role Counts ────────────────────────────────────────────────────────
+# These are defaults for 100 nodes. They are auto-recalculated at runtime.
+NUM_MISINFO_AGENTS = 1           # Always 1 (single claim source)
+NUM_INFLUENCERS = 5              # ~5% of nodes
+NUM_FACT_CHECKERS = 8            # ~8% of nodes
+NUM_MODERATORS = 10              # ~10% of nodes
 # Remaining nodes → normal users
+
+
+def calculate_agent_counts(num_nodes: int) -> dict:
+    """Auto-calculate agent counts based on graph size."""
+    return {
+        "num_misinfo": 1,                              # Always 1 source
+        "num_influencers": max(2, int(num_nodes * 0.05)),   # ~5%
+        "num_fact_checkers": max(3, int(num_nodes * 0.08)), # ~8%
+        "num_moderators": max(3, int(num_nodes * 0.10)),    # ~10%
+    }
+
 
 # ─── Propagation Parameters ──────────────────────────────────────────────────
 SPREAD_PROBABILITY = 0.35        # Base reshare probability for normal users
@@ -46,9 +63,10 @@ ROLE_COLOURS = {
     "normal":        "#3498db",   # Blue
 }
 STATUS_COLOURS = {
-    "infected":  "#ff6b6b",
-    "warned":    "#f1c40f",
-    "blocked":   "#95a5a6",
+    "infected":    "#ff6b6b",
+    "influenced":  "#ff9f43",
+    "warned":      "#f1c40f",
+    "blocked":     "#95a5a6",
 }
 
 # ─── Agent Role Prompts ───────────────────────────────────────────────────────
