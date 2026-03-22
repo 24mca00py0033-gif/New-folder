@@ -1,14 +1,3 @@
-"""
-LangGraph Pipeline for Single-Claim Sequential Misinformation Simulation
-=========================================================================
-Orchestrates 5 agents in sequence:
-  1. MisinformationAgent — Generates 1 claim via LLM
-  2. NeutralAgent — Spreads claim through BFS in the graph
-  3. InfluencerAgent — Modifies & amplifies claim in graph
-  4. FactCheckerAgent — Verifies claim & warns nodes
-  5. ModeratorAgent — Takes BLOCK/FLAG/ALLOW action
-  6. Analyse — Generate stats & visualisations
-"""
 import time
 from typing import TypedDict, List, Dict, Any
 
@@ -26,30 +15,28 @@ from config import (
 )
 
 
-# ─── State Definition ─────────────────────────────────────────────────────────
 
 class SimulationState(TypedDict):
     network_stats: Dict[str, Any]
 
-    # Single claim data
+    
     claim: Dict[str, Any]
     injection_result: Dict[str, Any]
 
-    # Per-agent results
+   
     spread_result: Dict[str, Any]
     influence_result: Dict[str, Any]
     fact_check_result: Dict[str, Any]
     moderation_result: Dict[str, Any]
 
-    # Agent stats table
     agent_stats_table: List[List[Any]]
 
-    # Analytics + visuals
+
     analytics: Dict[str, Any]
     network_graph_path: str
     analysis_chart_path: str
 
-    # Meta
+   
     pipeline_log: List[str]
     current_step: str
     start_time: float
@@ -57,14 +44,8 @@ class SimulationState(TypedDict):
     error: str
 
 
-# ─── Pipeline ────────────────────────────────────────────────────────────────
-
 class MisinformationPipeline:
-    """
-    LangGraph pipeline for sequential single-claim simulation:
-      generate_claim → spread_claim → influence_claim →
-      check_claim → moderate_claim → analyse
-    """
+  
 
     def __init__(
         self,
@@ -104,7 +85,7 @@ class MisinformationPipeline:
         wf.add_edge("analyse",         END)
         return wf.compile()
 
-    # ── steps ─────────────────────────────────────────────────────────────────
+
 
     def _step_generate(self, state: SimulationState) -> dict:
         log = list(state.get("pipeline_log", []))
@@ -222,7 +203,6 @@ class MisinformationPipeline:
         log = list(state.get("pipeline_log", []))
         log.append("📊 Step 6: Generating analytics & visualisations …")
 
-        # Collect cascade edges for visualization
         spread_edges = state.get("spread_result", {}).get("edges", [])
         influence_edges = state.get("influence_result", {}).get("edges", [])
         all_edges = spread_edges + influence_edges
@@ -258,7 +238,6 @@ class MisinformationPipeline:
             "pipeline_log": log,
         }
 
-    # ── public interface ──────────────────────────────────────────────────────
 
     def run_simulation(self) -> dict:
         self.network.reset_statuses()

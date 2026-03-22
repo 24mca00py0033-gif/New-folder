@@ -1,10 +1,3 @@
-"""
-Fact-Checker Agent
-==================
-After influencer amplification, fact-checker nodes scan the graph
-for infected/influenced nodes and verify the claim using LLM.
-They attach warning labels to nodes they check.
-"""
 import json
 import random
 from langchain_groq import ChatGroq
@@ -13,12 +6,6 @@ from config import GROQ_API_KEY, GROQ_MODEL, FACT_CHECKER_SYSTEM_PROMPT, TEMPERA
 
 
 class FactCheckerAgent:
-    """
-    Fact-checker nodes in the graph verify the circulating claim.
-    They scan their neighbourhoods for infected/influenced nodes,
-    verify the claim using LLM, and attach warning labels.
-    """
-
     def __init__(self):
         self.llm = None
         if GROQ_API_KEY:
@@ -33,14 +20,10 @@ class FactCheckerAgent:
                 self.llm = None
 
     def check_graph(self, network) -> dict:
-        """
-        Fact-checker nodes scan the graph, verify the claim,
-        and attach warnings to infected nodes in their neighbourhood.
-        """
+     
         G = network.graph
         fc_nodes = network.get_fact_checker_nodes()
 
-        # Get the claim text from any infected node
         claim_text = ""
         for n in G.nodes():
             if G.nodes[n].get("claim_text"):
@@ -59,17 +42,15 @@ class FactCheckerAgent:
                 "active_checkers": 0,
             }
 
-        # Verify the claim using LLM
+     
         verdict_result = self.verify_claim(claim_text)
 
-        # Fact-checker nodes scan their neighbourhoods
         nodes_checked = 0
         nodes_warned = 0
         warned_node_ids = []
         active_checkers = 0
 
         for fc_node in fc_nodes:
-            # Check if this fact-checker was exposed to the claim
             if G.nodes[fc_node]["exposure_count"] > 0 or any(
                 G.nodes[nb]["status"] in ("infected", "influenced")
                 for nb in G.neighbors(fc_node)
@@ -78,7 +59,7 @@ class FactCheckerAgent:
                 G.nodes[fc_node]["status"] = "warned"
                 G.nodes[fc_node]["warning_label"] = True
 
-                # Scan neighbours and attach warnings
+               
                 for nb in G.neighbors(fc_node):
                     if G.nodes[nb]["status"] in ("infected", "influenced"):
                         nodes_checked += 1
@@ -103,7 +84,7 @@ class FactCheckerAgent:
         }
 
     def verify_claim(self, claim_text: str) -> dict:
-        """Verify a claim using LLM or rule-based fallback."""
+      
         search_evidence = self._simulate_web_search(claim_text)
 
         if self.llm:
@@ -126,7 +107,6 @@ class FactCheckerAgent:
             except Exception:
                 pass
 
-        # Fallback rule-based
         return self._fallback_verdict(claim_text, search_evidence)
 
     @staticmethod

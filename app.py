@@ -1,13 +1,3 @@
-"""
-Gradio UI — Graph-Based Multi-Agent Misinformation Simulation System
-=====================================================================
-Provides an interactive web interface with configurable network size,
-sequential agent pipeline visualization, agent stats tables, and
-analytical dashboards.
-
-API key is loaded from .env — no UI input needed.
-Agent counts are auto-calculated based on graph size.
-"""
 import os
 import traceback
 
@@ -23,12 +13,11 @@ from config import (
 )
 
 
-# ─── Global state ─────────────────────────────────────────────────────────────
 pipeline_instance = None
 
 
 def initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification):
-    """Create (or recreate) the pipeline with the given parameters."""
+
     global pipeline_instance
     pipeline_instance = MisinformationPipeline(
         num_nodes=int(num_nodes),
@@ -39,10 +28,8 @@ def initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification):
     return pipeline_instance
 
 
-# ── Preview network ───────────────────────────────────────────────────────────
 
 def preview_network(num_nodes, edges_per_node, spread_prob, amplification):
-    """Generate and preview the social network graph (no cascade)."""
     try:
         pipe = initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification)
         path = pipe.network.visualize_network(
@@ -76,10 +63,9 @@ def preview_network(num_nodes, edges_per_node, spread_prob, amplification):
     return None, "❌ Failed to generate preview"
 
 
-# ── Simulation runner ─────────────────────────────────────────────────────────
 
 def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
-    """Execute the full sequential simulation and return UI outputs."""
+    
     empty_table = [["—", "—", "—", "—"]]
     empty_node_table = [["—", "—", "—", "—"]]
     empty = ("", "", "", "", "", "", "", None, None, "", empty_table, empty_node_table)

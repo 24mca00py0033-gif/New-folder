@@ -1,11 +1,3 @@
-"""
-Social Network Graph Module
-============================
-Creates and manages a synthetic social network using NetworkX.
-Uses the Barabási–Albert preferential attachment model.
-AI agent nodes (misinfo, influencer, fact-checker, moderator) are embedded
-directly inside the graph. Supports sequential agent phases.
-"""
 import random
 
 import networkx as nx
@@ -30,16 +22,6 @@ from config import (
 
 
 class SocialNetwork:
-    """
-    Scale-free social network with embedded AI agent nodes.
-
-    Roles assigned to nodes (highest-degree first):
-        misinfo      – single misinformation source node
-        influencer   – amplify content (× amplification_factor neighbours)
-        fact_checker – verify & label claims
-        moderator    – BLOCK / FLAG / ALLOW content
-        normal       – regular users reshare with base probability
-    """
 
     def __init__(
         self,
@@ -51,7 +33,7 @@ class SocialNetwork:
         self.edges_per_node = int(edges_per_node)
         self.seed = seed
 
-        # Auto-calculate agent counts based on graph size
+        
         agent_counts = calculate_agent_counts(self.num_nodes)
         self.num_misinfo = agent_counts["num_misinfo"]
         self.num_influencers = agent_counts["num_influencers"]
@@ -64,7 +46,6 @@ class SocialNetwork:
             self.graph, seed=seed, k=2.0 / np.sqrt(self.num_nodes), iterations=50
         )
 
-    # ── graph creation ────────────────────────────────────────────────────────
 
     def _create_graph(self):
         G = nx.barabasi_albert_graph(self.num_nodes, self.edges_per_node, seed=self.seed)
@@ -72,7 +53,7 @@ class SocialNetwork:
             G.nodes[n].update({
                 "label": f"User_{n}",
                 "role": "normal",
-                "status": "clean",        # clean | infected | influenced | warned | blocked
+                "status": "clean",   
                 "exposure_count": 0,
                 "shared": False,
                 "infection_time": -1,
@@ -83,33 +64,32 @@ class SocialNetwork:
         return G
 
     def _assign_roles(self):
-        """Assign agent roles to nodes sorted by descending degree."""
         degrees = dict(self.graph.degree())
         sorted_nodes = sorted(degrees, key=degrees.get, reverse=True)
 
         idx = 0
-        # Influencers get the highest-degree slots
+       
         for node in sorted_nodes[idx: idx + self.num_influencers]:
             self.graph.nodes[node]["role"] = "influencer"
         idx += self.num_influencers
 
-        # Fact-checkers
+      
         for node in sorted_nodes[idx: idx + self.num_fact_checkers]:
             self.graph.nodes[node]["role"] = "fact_checker"
         idx += self.num_fact_checkers
 
-        # Moderators
+        
         for node in sorted_nodes[idx: idx + self.num_moderators]:
             self.graph.nodes[node]["role"] = "moderator"
         idx += self.num_moderators
 
-        # Misinformation agent – pick from remaining normal nodes (medium degree)
+       
         available = [n for n in sorted_nodes if self.graph.nodes[n]["role"] == "normal"]
         if available:
-            mid_idx = len(available) // 3  # Pick from upper-middle range
+            mid_idx = len(available) // 3  
             self.graph.nodes[available[mid_idx]]["role"] = "misinfo"
 
-    # ── accessors ─────────────────────────────────────────────────────────────
+    
 
     def get_nodes_by_role(self, role):
         return [n for n in self.graph.nodes() if self.graph.nodes[n]["role"] == role]
@@ -157,7 +137,7 @@ class SocialNetwork:
                 "blocked_by": None,
             })
 
-    # ── network statistics ────────────────────────────────────────────────────
+    
 
     def get_network_stats(self) -> dict:
         degrees = dict(self.graph.degree())
@@ -178,7 +158,7 @@ class SocialNetwork:
         }
 
     def get_agent_stats_table(self) -> list:
-        """Return table data for agent working stats."""
+      
         status_counts = {}
         for n in self.graph.nodes():
             st = self.graph.nodes[n]["status"]
@@ -200,23 +180,18 @@ class SocialNetwork:
             ["📊 Total Nodes", total, "100%"],
         ]
 
-    # ── visualisation ─────────────────────────────────────────────────────────
-
+   
     def visualize_network(
         self,
         title="Social Network Graph",
         save_path="network_graph.png",
         show_cascade_edges=None,
     ) -> str:
-        """
-        Draw the full network. Nodes are coloured by status;
-        agent nodes are highlighted to show the simulation state.
-        """
         fig, ax = plt.subplots(1, 1, figsize=GRAPH_FIGURE_SIZE, dpi=GRAPH_DPI)
         fig.patch.set_facecolor("#0a0a0a")
         ax.set_facecolor("#0a0a0a")
 
-        # ── node colours ──
+    
         node_colors = []
         for n in self.graph.nodes():
             st = self.graph.nodes[n]["status"]
@@ -232,26 +207,25 @@ class SocialNetwork:
             else:
                 node_colors.append(ROLE_COLOURS.get(rl, ROLE_COLOURS["normal"]))
 
-        # ── node sizes ──
+  
         degrees = dict(self.graph.degree())
         node_sizes = [NODE_SIZE_BASE + degrees[n] * NODE_SIZE_SCALE for n in self.graph.nodes()]
 
-        # ── draw edges ──
+   
         nx.draw_networkx_edges(self.graph, self.pos, ax=ax, alpha=0.08,
                                edge_color="#555555", width=0.3)
 
-        # highlight cascade edges
+
         if show_cascade_edges:
             nx.draw_networkx_edges(self.graph, self.pos, edgelist=show_cascade_edges,
                                    ax=ax, alpha=0.6, edge_color="#e74c3c",
                                    width=1.2, style="solid")
 
-        # ── draw nodes ──
+    
         nx.draw_networkx_nodes(self.graph, self.pos, ax=ax, node_color=node_colors,
                                node_size=node_sizes, edgecolors="#ffffff",
                                linewidths=0.3, alpha=0.92)
 
-        # labels for agent nodes only
         label_map = {}
         for n in self.graph.nodes():
             rl = self.graph.nodes[n]["role"]
@@ -267,7 +241,7 @@ class SocialNetwork:
             nx.draw_networkx_labels(self.graph, self.pos, label_map, ax=ax,
                                     font_size=5, font_color="white", font_weight="bold")
 
-        # legend
+    
         legend_elements = [
             mpatches.Patch(color=ROLE_COLOURS["misinfo"],
                            label=f"Misinfo Source ({len(self.get_misinfo_nodes())})"),
@@ -316,8 +290,6 @@ class SocialNetwork:
         fact_check_data = simulation_result.get("fact_check_result", {})
         moderation_data = simulation_result.get("moderation_result", {})
 
-        # ── 1. Spread per step ────────────────────────────────────────────────
-        ax1 = axes[0, 0]
         steps = spread_data.get("spread_per_step", [])
         if steps:
             cum = np.cumsum(steps)
@@ -329,7 +301,7 @@ class SocialNetwork:
         ax1.set_title("Cumulative Spread Velocity")
         ax1.grid(True, alpha=0.2, color="#444")
 
-        # ── 2. Node status distribution ───────────────────────────────────────
+     
         ax2 = axes[0, 1]
         sc = moderation_data.get("final_status_counts", {})
         if not sc:

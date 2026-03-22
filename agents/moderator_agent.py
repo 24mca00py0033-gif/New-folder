@@ -1,10 +1,3 @@
-"""
-Moderator Agent
-===============
-After fact-checking, moderator nodes take action on infected/influenced nodes.
-Based on the fact-checker verdict, moderators can BLOCK, FLAG, or ALLOW content.
-This is the final agent phase that stops or reduces misinformation spread.
-"""
 import json
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -12,12 +5,6 @@ from config import GROQ_API_KEY, GROQ_MODEL, MODERATOR_SYSTEM_PROMPT, TEMPERATUR
 
 
 class ModeratorAgent:
-    """
-    Moderator nodes take action on the network based on fact-checker results.
-    They can BLOCK (stop spread), FLAG (warn users), or ALLOW content.
-    Each moderator scans its neighbourhood and applies its decision.
-    """
-
     def __init__(self):
         self.llm = None
         if GROQ_API_KEY:
@@ -32,10 +19,6 @@ class ModeratorAgent:
                 self.llm = None
 
     def moderate_graph(self, network, fact_check_result: dict) -> dict:
-        """
-        Moderator nodes take action on the graph based on fact-checker results.
-        They scan their neighbourhoods and apply moderation decisions.
-        """
         G = network.graph
         mod_nodes = network.get_moderator_nodes()
 
@@ -44,10 +27,10 @@ class ModeratorAgent:
         confidence = fact_check_result.get("confidence", 0.5)
         evidence = fact_check_result.get("evidence", "")
 
-        # Get LLM moderation decision
+        
         decision_result = self._make_decision(claim_text, verdict, confidence, evidence)
 
-        # Apply moderation to graph
+   
         nodes_blocked = 0
         nodes_flagged = 0
         nodes_allowed = 0
@@ -56,7 +39,7 @@ class ModeratorAgent:
         active_moderators = 0
 
         for mod_node in mod_nodes:
-            # Check if moderator is near infected content
+            
             neighbours_infected = [
                 nb for nb in G.neighbors(mod_node)
                 if G.nodes[nb]["status"] in ("infected", "influenced")
@@ -66,7 +49,7 @@ class ModeratorAgent:
                 continue
 
             active_moderators += 1
-            G.nodes[mod_node]["status"] = "warned"  # Moderator is aware
+            G.nodes[mod_node]["status"] = "warned" 
 
             for nb in neighbours_infected:
                 if decision_result["decision"] == "BLOCK":
@@ -76,15 +59,15 @@ class ModeratorAgent:
                     nodes_blocked += 1
                     blocked_node_ids.append(nb)
                 elif decision_result["decision"] == "FLAG":
-                    if G.nodes[nb]["status"] != "blocked":  # Don't override block
+                    if G.nodes[nb]["status"] != "blocked": 
                         G.nodes[nb]["status"] = "warned"
                         G.nodes[nb]["warning_label"] = True
                         nodes_flagged += 1
                         flagged_node_ids.append(nb)
-                else:  # ALLOW
+                else:  
                     nodes_allowed += 1
 
-        # Count final node statuses across the entire graph
+
         status_counts = {"clean": 0, "infected": 0, "influenced": 0, "warned": 0, "blocked": 0}
         for n in G.nodes():
             st = G.nodes[n]["status"]
@@ -109,7 +92,7 @@ class ModeratorAgent:
         }
 
     def _make_decision(self, claim_text, verdict, confidence, evidence) -> dict:
-        """Make moderation decision using LLM or rules."""
+       
         if self.llm and claim_text:
             try:
                 prompt = (

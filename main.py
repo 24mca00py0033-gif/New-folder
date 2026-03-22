@@ -1,8 +1,3 @@
-"""
-CLI entry point for the Misinformation Simulation.
-Run: python main.py
-Or use the Gradio UI: python app.py
-"""
 from pipeline import MisinformationPipeline
 from config import calculate_agent_counts
 

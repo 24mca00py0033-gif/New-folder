@@ -1,10 +1,3 @@
-"""
-Influencer Agent
-================
-After neutral spread, influencer nodes that were exposed to the claim
-modify/amplify it using LLM and re-spread to their additional neighbours.
-This simulates how social media influencers amplify content.
-"""
 import random
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -15,12 +8,6 @@ from config import (
 
 
 class InfluencerAgent:
-    """
-    Influencer nodes modify the claim and amplify its spread.
-    After neutral users have spread the claim, influencers who were
-    exposed to it rewrite it for maximum engagement and spread it
-    to their neighbours.
-    """
 
     def __init__(self):
         self.llm = None
@@ -36,17 +23,14 @@ class InfluencerAgent:
                 self.llm = None
 
     def influence_graph(self, network, amplification: float | None = None) -> dict:
-        """
-        Influencer nodes that were exposed to the claim modify it
-        and spread to their additional neighbours.
-        """
+      
         if amplification is None:
             amplification = AMPLIFICATION_FACTOR
 
         G = network.graph
         influencer_nodes = network.get_influencer_nodes()
 
-        # Find influencers who were exposed (have exposure_count > 0)
+       
         active_influencers = [
             n for n in influencer_nodes
             if G.nodes[n]["exposure_count"] > 0
@@ -62,17 +46,15 @@ class InfluencerAgent:
                 "influenced_nodes": [],
             }
 
-        # Get the original claim from any infected node
+        
         claim_text = ""
         for n in G.nodes():
             if G.nodes[n].get("claim_text"):
                 claim_text = G.nodes[n]["claim_text"]
                 break
 
-        # Use LLM to modify the claim
+       
         modified_claim = self._modify_claim(claim_text)
-
-        # Spread from influencer nodes to their neighbours
         influenced_nodes = []
         edges = []
 
@@ -84,12 +66,12 @@ class InfluencerAgent:
             neighbours = list(G.neighbors(inf_node))
             random.shuffle(neighbours)
 
-            # Amplified fan-out
+           
             fan_out = min(len(neighbours), int(len(neighbours) * amplification))
 
             for nb in neighbours[:fan_out]:
                 if G.nodes[nb]["status"] == "clean":
-                    # Higher spread probability for influencer-amplified content
+                    
                     if random.random() < 0.6:
                         G.nodes[nb]["status"] = "influenced"
                         G.nodes[nb]["shared"] = True
@@ -113,7 +95,7 @@ class InfluencerAgent:
         }
 
     def _modify_claim(self, claim_text: str) -> str:
-        """Use LLM to rewrite the claim for maximum viral spread."""
+      
         if not claim_text:
             return ""
 
@@ -135,7 +117,6 @@ class InfluencerAgent:
             except Exception:
                 pass
 
-        # Fallback: simple amplification
         return f"🔥 BREAKING: {claim_text} — Share this NOW! #Viral #Breaking"
 
     @staticmethod

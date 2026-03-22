@@ -1,11 +1,3 @@
-"""
-Neutral Agent (Normal User Spread)
-====================================
-Simulates how normal users spread content in the social network.
-This agent runs a BFS cascade from the infected source node,
-where normal users reshare content with a base probability.
-This is the FIRST spreading phase after misinformation injection.
-"""
 import random
 from collections import deque
 
@@ -13,11 +5,6 @@ from config import SPREAD_PROBABILITY, MAX_SPREAD_DEPTH
 
 
 class NeutralAgent:
-    """
-    Spreads the claim through the network via BFS cascade.
-    Normal users reshare with base probability. Other agent nodes
-    are skipped during this phase (they act in their own phases).
-    """
 
     def __init__(self, network):
         self.network = network
@@ -27,11 +14,6 @@ class NeutralAgent:
         spread_prob: float | None = None,
         max_depth: int | None = None,
     ) -> dict:
-        """
-        Run BFS cascade from the infected misinfo source node.
-        Only normal users participate in this spreading phase.
-        Returns detailed spread statistics.
-        """
         if spread_prob is None:
             spread_prob = SPREAD_PROBABILITY
         if max_depth is None:
@@ -39,7 +21,7 @@ class NeutralAgent:
 
         G = self.network.graph
 
-        # Find the infected source node
+        
         source_nodes = [n for n in G.nodes() if G.nodes[n]["status"] == "infected"]
         if not source_nodes:
             return {"success": False, "error": "No infected source node found"}
@@ -47,7 +29,7 @@ class NeutralAgent:
         src_node = source_nodes[0]
         claim_text = G.nodes[src_node].get("claim_text", "")
 
-        # BFS spread
+     
         queue = deque([(src_node, 0)])
         visited = {src_node}
         spread_path = [src_node]
@@ -61,7 +43,7 @@ class NeutralAgent:
             if depth > max_depth:
                 break
 
-            # Track steps per BFS level
+            
             if depth > current_depth:
                 spread_per_step.append(step_count)
                 step_count = 0
@@ -80,15 +62,14 @@ class NeutralAgent:
 
                 nb_role = G.nodes[nb]["role"]
 
-                # Only normal users and misinfo nodes spread in this phase
-                # Influencer, fact-checker, moderator nodes are skipped
+            
                 if nb_role in ("influencer", "fact_checker", "moderator"):
-                    # These nodes are exposed but don't reshare yet
+                   
                     visited.add(nb)
                     G.nodes[nb]["exposure_count"] += 1
                     continue
 
-                # Normal user reshare decision
+               
                 if random.random() < spread_prob:
                     visited.add(nb)
                     spread_path.append(nb)
@@ -101,11 +82,11 @@ class NeutralAgent:
                     G.nodes[nb]["claim_text"] = claim_text
                     queue.append((nb, depth + 1))
 
-        # Final step count
+        
         if step_count:
             spread_per_step.append(step_count)
 
-        # Compute stats
+        
         infected_nodes = [n for n in G.nodes() if G.nodes[n]["status"] == "infected"]
         total_infected = len(infected_nodes)
         total_nodes = self.network.num_nodes
@@ -127,7 +108,7 @@ class NeutralAgent:
         }
 
     def get_spread_summary(self, spread_result: dict) -> str:
-        """Human-readable summary of the spread phase."""
+      
         sr = spread_result
         return (
             f"\n{'='*60}\n"

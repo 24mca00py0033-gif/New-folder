@@ -1,60 +1,51 @@
-"""
-Configuration for the Graph-Based Multi-Agent Misinformation Simulation System.
-All tuneable parameters live here so every module stays in sync.
-Agent counts are auto-calculated based on graph size.
-"""
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# ─── Groq API Configuration ───────────────────────────────────────────────────
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 GROQ_MODEL = "llama-3.3-70b-versatile"
 
-# ─── Social Network Configuration ─────────────────────────────────────────────
-NETWORK_NUM_NODES = 100          # Default nodes (user can choose 100-1000)
-NETWORK_EDGES_PER_NODE = 3       # m parameter (edges per new node)
-NETWORK_SEED = 42                # Reproducibility seed
 
-# ─── Agent Role Counts ────────────────────────────────────────────────────────
-# These are defaults for 100 nodes. They are auto-recalculated at runtime.
-NUM_MISINFO_AGENTS = 1           # Always 1 (single claim source)
-NUM_INFLUENCERS = 5              # ~5% of nodes
-NUM_FACT_CHECKERS = 8            # ~8% of nodes
-NUM_MODERATORS = 10              # ~10% of nodes
-# Remaining nodes → normal users
+NETWORK_NUM_NODES = 100         
+NETWORK_EDGES_PER_NODE = 3       
+NETWORK_SEED = 42             
+
+NUM_MISINFO_AGENTS = 1         
+NUM_INFLUENCERS = 5              
+NUM_FACT_CHECKERS = 8          
+NUM_MODERATORS = 10         
+
 
 
 def calculate_agent_counts(num_nodes: int) -> dict:
-    """Auto-calculate agent counts based on graph size."""
+  
     return {
-        "num_misinfo": 1,                              # Always 1 source
-        "num_influencers": max(2, int(num_nodes * 0.05)),   # ~5%
-        "num_fact_checkers": max(3, int(num_nodes * 0.08)), # ~8%
-        "num_moderators": max(3, int(num_nodes * 0.10)),    # ~10%
+        "num_misinfo": 1,                              
+        "num_influencers": max(2, int(num_nodes * 0.05)),  
+        "num_fact_checkers": max(3, int(num_nodes * 0.08)), 
+        "num_moderators": max(3, int(num_nodes * 0.10)),    
     }
 
 
-# ─── Propagation Parameters ──────────────────────────────────────────────────
-SPREAD_PROBABILITY = 0.35        # Base reshare probability for normal users
-AMPLIFICATION_FACTOR = 3.0       # Influencers spread to N× more neighbours
-MAX_SPREAD_DEPTH = 15            # Max BFS hops per cascade
-FACT_CHECK_SLOW = 0.15           # Fact-checker reshare probability (with warning)
-MODERATOR_BLOCK_PROB = 0.85      # Probability a moderator blocks fake content
-MODERATOR_FLAG_PROB = 0.70       # Probability a moderator flags unverified content
 
-# ─── Simulation Parameters ────────────────────────────────────────────────────
-TEMPERATURE = 0.7                # LLM temperature for creative agents
+SPREAD_PROBABILITY = 0.35       
+AMPLIFICATION_FACTOR = 3.0      
+MAX_SPREAD_DEPTH = 15           
+FACT_CHECK_SLOW = 0.15        
+MODERATOR_BLOCK_PROB = 0.85      
+MODERATOR_FLAG_PROB = 0.70      
 
-# ─── Visualization ────────────────────────────────────────────────────────────
+
+TEMPERATURE = 0.7               
+
+
 GRAPH_FIGURE_SIZE = (28, 22)
 GRAPH_DPI = 120
 NODE_SIZE_BASE = 30
 NODE_SIZE_SCALE = 18
 
-# ─── Role Colours (used everywhere) ──────────────────────────────────────────
+
 ROLE_COLOURS = {
     "misinfo":       "#e74c3c",   # Red
     "influencer":    "#f5a623",   # Orange
@@ -69,7 +60,7 @@ STATUS_COLOURS = {
     "blocked":     "#95a5a6",
 }
 
-# ─── Agent Role Prompts ───────────────────────────────────────────────────────
+
 MISINFORMATION_SYSTEM_PROMPT = """You are a misinformation simulation agent for research purposes only.
 Your role is to generate realistic-sounding but potentially false news claims for studying
 misinformation spread patterns. Generate claims that are plausible but may be fabricated.

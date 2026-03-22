@@ -1,17 +1,9 @@
-"""
-Analytics Module
-================
-Comprehensive analytics for the single-claim misinformation simulation.
-Computes per-agent statistics, spread velocity, containment metrics,
-and generates formatted reports with table data for Gradio UI.
-"""
+
 import numpy as np
 
 
 class SimulationAnalytics:
-    """
-    Produces detailed analytics from a completed simulation state.
-    """
+
 
     def __init__(self, network):
         self.network = network
@@ -34,7 +26,7 @@ class SimulationAnalytics:
         }
 
     def compute_agent_activity(self, state: dict) -> list:
-        """Generate agent activity table data."""
+      
         spread = state.get("spread_result", {})
         influence = state.get("influence_result", {})
         fc = state.get("fact_check_result", {})
@@ -58,7 +50,7 @@ class SimulationAnalytics:
         ]
 
     def compute_node_breakdown(self, state: dict) -> list:
-        """Generate node status breakdown table."""
+      
         mod = state.get("moderation_result", {})
         sc = mod.get("final_status_counts", {})
         if not sc:
