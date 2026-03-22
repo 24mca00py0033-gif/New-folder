@@ -290,6 +290,7 @@ class SocialNetwork:
         fact_check_data = simulation_result.get("fact_check_result", {})
         moderation_data = simulation_result.get("moderation_result", {})
 
+        ax1 = axes[0, 0]
         steps = spread_data.get("spread_per_step", [])
         if steps:
             cum = np.cumsum(steps)

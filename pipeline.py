@@ -220,7 +220,9 @@ class MisinformationPipeline:
             chart_path = self.network.visualize_spread_analysis(
                 state, save_path="spread_analysis.png",
             )
-        except Exception:
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
             chart_path = ""
 
         elapsed = time.time() - state.get("start_time", time.time())

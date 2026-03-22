@@ -207,8 +207,6 @@ def create_ui():
 
     with gr.Blocks(
         title="Multi-Agent Misinformation Simulation",
-        theme=GRADIO_THEME,
-        css=CUSTOM_CSS,
     ) as app:
 
         # ─── Header ──────────────────────────────────────────────────
@@ -411,5 +409,5 @@ Python · NetworkX (Barabási-Albert) · LangGraph · Groq (LLaMA 3.3 70B)
 if __name__ == "__main__":
     app = create_ui()
     app.launch(
-        share=False, server_name="0.0.0.0", server_port=7860,
+        share=False, server_name="0.0.0.0", server_port=7869, theme=GRADIO_THEME, css=CUSTOM_CSS,
     )
