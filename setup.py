@@ -1,6 +1,3 @@
-"""
-Setup file for the AI Multi-Agent Misinformation System.
-"""
 from setuptools import setup, find_packages
 
 with open("README.md", "r", encoding="utf-8") as fh:
@@ -12,7 +9,7 @@ with open("requirements.txt", "r", encoding="utf-8") as fh:
 setup(
     name="ai-misinformation-simulation",
     version="1.0.0",
-    author="MCA Final Year Project",
+    author="",
     description=(
         "AI Multi-Agent Misinformation Spread, Verification & Moderation System: "
         "A Graph-Based Simulation Platform for Social Network Information Dynamics"

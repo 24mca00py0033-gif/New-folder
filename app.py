@@ -213,7 +213,7 @@ def create_ui():
         gr.Markdown("""
 # 🛡️ AI Multi-Agent Misinformation Simulation System
 ### Sequential Pipeline: Misinformation → Neutral Spread → Influencer → Fact-Checker → Moderator
-*MCA Final Year Project — Simulating Social Network Information Dynamics*
+ Simulating Social Network Information Dynamics*
 ---
         """)
 

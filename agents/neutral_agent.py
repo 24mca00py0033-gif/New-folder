@@ -41,7 +41,7 @@ class NeutralAgent:
         while queue:
             node, depth = queue.popleft()
             if depth > max_depth:
-                break
+                continue
 
             
             if depth > current_depth:
