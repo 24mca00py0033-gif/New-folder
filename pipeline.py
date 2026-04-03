@@ -54,11 +54,21 @@ class MisinformationPipeline:
         seed=NETWORK_SEED,
         spread_prob=SPREAD_PROBABILITY,
         amplification=AMPLIFICATION_FACTOR,
+        num_influencers=None,
+        num_fact_checkers=None,
+        num_moderators=None,
     ):
         self.spread_prob = spread_prob
         self.amplification = amplification
 
-        self.network = create_network(num_nodes, edges_per_node, seed)
+        self.network = create_network(
+            num_nodes,
+            edges_per_node,
+            seed,
+            num_influencers=num_influencers,
+            num_fact_checkers=num_fact_checkers,
+            num_moderators=num_moderators,
+        )
         self.misinfo_agent = MisinformationAgent()
         self.neutral_agent = NeutralAgent(self.network)
         self.fact_checker = FactCheckerAgent()

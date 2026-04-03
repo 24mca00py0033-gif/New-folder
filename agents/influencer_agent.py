@@ -104,8 +104,10 @@ class InfluencerAgent:
                 prompt = (
                     f"The following claim is circulating on social media:\n\n"
                     f'CLAIM: "{claim_text}"\n\n'
-                    "Rewrite it to maximize viral engagement with hooks, "
-                    "emotional triggers, and hashtags. Make it attention-grabbing. "
+                    "Rewrite it in an India-specific context using local civic/political wording. "
+                    "For fake or unverified content, convert it into a warning-style corrective message. "
+                    "For real content, maximize engagement with hooks, emotional triggers, and hashtags. "
+                    "Keep references relevant to current Indian discourse. Make it attention-grabbing. "
                     "Write ONLY the rewritten post."
                 )
                 messages = [

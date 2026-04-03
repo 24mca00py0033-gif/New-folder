@@ -1,8 +1,14 @@
 import json
-import random
+from typing import Any
+
 from langchain_groq import ChatGroq
 from langchain_core.messages import SystemMessage, HumanMessage
 from config import GROQ_API_KEY, GROQ_MODEL, FACT_CHECKER_SYSTEM_PROMPT, TEMPERATURE
+
+try:
+    from duckduckgo_search import DDGS
+except Exception:
+    DDGS = None
 
 
 class FactCheckerAgent:
@@ -40,6 +46,9 @@ class FactCheckerAgent:
                 "evidence": "No claim found in the network",
                 "red_flags": [],
                 "active_checkers": 0,
+                "search_provider": "duckduckgo",
+                "search_summary": "No claim present, so no web search executed.",
+                "search_sources": [],
             }
 
      
@@ -76,6 +85,9 @@ class FactCheckerAgent:
             "confidence": verdict_result["confidence"],
             "evidence": verdict_result["evidence"],
             "red_flags": verdict_result.get("red_flags", []),
+            "search_provider": verdict_result.get("search_provider", "duckduckgo"),
+            "search_summary": verdict_result.get("search_summary", ""),
+            "search_sources": verdict_result.get("search_sources", []),
             "nodes_checked": nodes_checked,
             "nodes_warned": nodes_warned,
             "warned_node_ids": warned_node_ids,
@@ -84,15 +96,14 @@ class FactCheckerAgent:
         }
 
     def verify_claim(self, claim_text: str) -> dict:
-      
-        search_evidence = self._simulate_web_search(claim_text)
+        search_evidence, search_sources, search_provider = self._live_web_search(claim_text)
 
         if self.llm:
             try:
                 prompt = (
                     f'Analyze the following claim for truthfulness:\n\n'
                     f'CLAIM: "{claim_text}"\n\n'
-                    f'SEARCH EVIDENCE: {search_evidence}\n\n'
+                    f'WEB SEARCH EVIDENCE (provider={search_provider}):\n{search_evidence}\n\n'
                     f'Respond ONLY with valid JSON in the specified format.'
                 )
                 messages = [
@@ -103,20 +114,72 @@ class FactCheckerAgent:
                 result = self._parse_verdict(response.content)
                 result["claim"] = claim_text
                 result["search_evidence"] = search_evidence
+                result["search_provider"] = search_provider
+                result["search_summary"] = f"Searched via {search_provider} and found {len(search_sources)} relevant sources."
+                result["search_sources"] = search_sources
                 return result
             except Exception:
                 pass
 
-        return self._fallback_verdict(claim_text, search_evidence)
+        return self._fallback_verdict(claim_text, search_evidence, search_sources, search_provider)
 
     @staticmethod
-    def _simulate_web_search(claim_text: str) -> str:
-        return (
-            f"Simulated web search for: '{claim_text[:80]}…'\n"
-            "- No official sources confirm this claim.\n"
-            "- Similar claims flagged by fact-checking organisations.\n"
-            "- Specific details could not be independently verified."
-        )
+    def _format_search_evidence(claim_text: str, sources: list[dict[str, str]], provider: str) -> str:
+        lines = [
+            f"Search provider: {provider}",
+            f"Query: {claim_text}",
+        ]
+        if not sources:
+            lines.append("No reliable search results were returned.")
+            return "\n".join(lines)
+
+        for idx, src in enumerate(sources, start=1):
+            lines.append(
+                f"[{idx}] {src.get('title', 'Untitled')} | {src.get('url', 'N/A')} | {src.get('snippet', '')}"
+            )
+        return "\n".join(lines)
+
+    def _live_web_search(self, claim_text: str, max_results: int = 6) -> tuple[str, list[dict[str, str]], str]:
+        provider = "duckduckgo"
+        if DDGS is None:
+            summary = (
+                "DuckDuckGo search package is not available. "
+                "Install duckduckgo-search to enable live web lookup."
+            )
+            return summary, [], provider
+
+        queries = [
+            claim_text,
+            f"{claim_text} fact check",
+            f"India election fact check {claim_text[:100]}",
+        ]
+
+        sources: list[dict[str, str]] = []
+        seen_urls: set[str] = set()
+
+        try:
+            with DDGS() as ddgs:
+                for query in queries:
+                    for item in ddgs.text(query, max_results=max_results):
+                        url = (item.get("href") or "").strip()
+                        if not url or url in seen_urls:
+                            continue
+                        seen_urls.add(url)
+                        sources.append({
+                            "title": (item.get("title") or "Untitled").strip(),
+                            "url": url,
+                            "snippet": (item.get("body") or "").strip(),
+                            "query": query,
+                        })
+                        if len(sources) >= max_results:
+                            break
+                    if len(sources) >= max_results:
+                        break
+        except Exception as e:
+            return f"DuckDuckGo search failed: {e}", [], provider
+
+        summary = self._format_search_evidence(claim_text, sources, provider)
+        return summary, sources, provider
 
     @staticmethod
     def _parse_verdict(response_text: str) -> dict:
@@ -152,7 +215,12 @@ class FactCheckerAgent:
             }
 
     @staticmethod
-    def _fallback_verdict(claim_text: str, evidence: str) -> dict:
+    def _fallback_verdict(
+        claim_text: str,
+        evidence: str,
+        sources: list[dict[str, str]],
+        search_provider: str,
+    ) -> dict:
         red_flags = []
         score = 0.5
         lower = claim_text.lower()
@@ -170,6 +238,9 @@ class FactCheckerAgent:
             "evidence": "Rule-based analysis (LLM unavailable). " + evidence,
             "red_flags": red_flags or ["No specific red flags detected"],
             "search_evidence": evidence,
+            "search_provider": search_provider,
+            "search_summary": f"Searched via {search_provider} and found {len(sources)} relevant sources.",
+            "search_sources": sources,
         }
 
     @staticmethod

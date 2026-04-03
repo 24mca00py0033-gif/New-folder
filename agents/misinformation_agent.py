@@ -7,10 +7,18 @@ from config import GROQ_API_KEY, GROQ_MODEL, MISINFORMATION_SYSTEM_PROMPT, TEMPE
 class MisinformationAgent:
 
     TOPICS = [
-        "government policy", "health and medicine", "technology",
-        "environment", "education", "economy", "science",
-        "social media", "international relations", "public safety",
-        "artificial intelligence", "climate change", "cybersecurity",
+        "Indian general elections and campaign narratives",
+        "state elections and coalition politics in India",
+        "LPG cylinder shortage and fuel distribution in India",
+        "India border tension and regional security updates",
+        "Indian parliament policy debates and political affairs",
+        "NEET, UPSC, SSC and other major Indian exam controversies",
+        "public hospital load and healthcare access in India",
+        "inflation, food prices, and household costs in Indian cities",
+        "Indian digital policy, UPI, and cybersecurity incidents",
+        "farmer protests, MSP discussions, and rural welfare in India",
+        "railway recruitment, government jobs, and youth employment in India",
+        "monsoon, flooding, and disaster response in Indian states",
     ]
 
     def __init__(self):
@@ -33,8 +41,9 @@ class MisinformationAgent:
         if self.llm:
             try:
                 prompt = (
-                    f"Generate a short, realistic news-like claim about {topic} that could be either "
-                    "real or fake. 1-2 sentences, specific with names/numbers/dates. "
+                    f"Generate a short, realistic India-specific news-like claim about {topic} that could be either "
+                    "real or fake inside a closed simulation. 1-2 sentences, specific with names/numbers/dates, "
+                    "and Indian place/context references. "
                     "Generate ONLY the claim text."
                 )
                 messages = [

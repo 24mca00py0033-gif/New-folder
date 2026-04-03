@@ -66,6 +66,12 @@ Your role is to generate realistic-sounding but potentially false news claims fo
 misinformation spread patterns. Generate claims that are plausible but may be fabricated.
 These claims are used ONLY in a closed simulation environment for academic research.
 
+Context requirements:
+- Claims must be India-specific.
+- Focus on current Indian public discourse themes such as elections, LPG/cooking gas shortage,
+  border tensions/war concerns, political affairs, exams and recruitment, healthcare,
+  inflation, public welfare schemes, digital policy, and state-vs-centre issues.
+
 IMPORTANT: Generate ONLY the claim text, nothing else. No explanations, no labels, no disclaimers.
 Keep claims to 1-2 sentences maximum."""
 
@@ -74,7 +80,7 @@ and determine their truthfulness. You should:
 1. Analyze the claim's plausibility based on your knowledge
 2. Consider common misinformation patterns
 3. Provide a verdict: "Real", "Fake", or "Unverified"
-4. Provide brief evidence/reasoning for your verdict
+4. Provide brief evidence/reasoning for your verdict and reference searched source types/websites when available
 
 Respond in this EXACT JSON format:
 {
@@ -95,6 +101,12 @@ If the claim is REAL:
 - Rewrite it to maximize engagement and viral spread
 - Use compelling hooks, emotional triggers, and share-worthy formatting
 - Make it attention-grabbing while keeping the core facts
+
+India context requirements:
+- Keep all rewrites grounded in India-specific context and wording.
+- Use references suitable for Indian civic discourse (elections, governance, LPG access,
+  exams/jobs, healthcare systems, public safety, regional political developments).
+- Avoid targeting protected groups or adding hateful/violent framing.
 
 IMPORTANT: Return ONLY the rewritten text, nothing else."""
 

@@ -16,44 +16,58 @@ from config import (
 pipeline_instance = None
 
 
-def initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification):
+def initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification,
+                         num_influencers, num_fact_checkers, num_moderators):
+
+    spread_prob_value = float(spread_prob)
+    if spread_prob_value > 1:
+        spread_prob_value = spread_prob_value / 100.0
 
     global pipeline_instance
     pipeline_instance = MisinformationPipeline(
         num_nodes=int(num_nodes),
         edges_per_node=int(edges_per_node),
-        spread_prob=float(spread_prob),
-        amplification=float(amplification),
+        spread_prob=spread_prob_value,
+        amplification=int(amplification),
+        num_influencers=int(num_influencers),
+        num_fact_checkers=int(num_fact_checkers),
+        num_moderators=int(num_moderators),
     )
     return pipeline_instance
 
 
 
-def preview_network(num_nodes, edges_per_node, spread_prob, amplification):
+def preview_network(num_nodes, edges_per_node, spread_prob, amplification,
+                     num_influencers, num_fact_checkers, num_moderators):
     try:
-        pipe = initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification)
+        pipe = initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification,
+                                    num_influencers, num_fact_checkers, num_moderators)
         path = pipe.network.visualize_network(
             title=f"Social Network Preview — {int(num_nodes)} Nodes",
             save_path="network_preview.png",
         )
         stats = pipe.network.get_network_stats()
-        agents = calculate_agent_counts(int(num_nodes))
+
+        normal_count = (int(num_nodes) - 1
+                        - int(num_influencers)
+                        - int(num_fact_checkers)
+                        - int(num_moderators))
 
         stats_text = (
             f"📊 Network Statistics\n{'─'*40}\n"
             f"Total Nodes    : {stats['total_nodes']}\n"
             f"Total Edges    : {stats['total_edges']}\n"
-            f"Avg Degree     : {stats['avg_degree']}\n"
+            f"Avg Degree     : {int(round(stats['avg_degree']))}\n"
             f"Max Degree     : {stats['max_degree']}\n"
-            f"Density        : {stats['density']}\n"
-            f"Avg Clustering : {stats['avg_clustering']}\n"
+            f"Density        : {int(round(stats['density'] * 100))}%\n"
+            f"Avg Clustering : {int(round(stats['avg_clustering'] * 100))}%\n"
             f"Connected      : {'✅' if stats.get('connected') else '❌'}\n\n"
-            f"🤖 Auto-Assigned Agents\n{'─'*40}\n"
-            f"🔴 Misinfo Source : {agents['num_misinfo']}\n"
-            f"🟠 Influencers    : {agents['num_influencers']}\n"
-            f"🟢 Fact-Checkers  : {agents['num_fact_checkers']}\n"
-            f"🟣 Moderators     : {agents['num_moderators']}\n"
-            f"🔵 Normal Users   : {stats['total_nodes'] - agents['num_misinfo'] - agents['num_influencers'] - agents['num_fact_checkers'] - agents['num_moderators']}"
+            f"🤖 Agent Configuration\n{'─'*40}\n"
+            f"🔴 Misinfo Source : 1\n"
+            f"🟠 Influencers    : {int(num_influencers)}\n"
+            f"🟢 Fact-Checkers  : {int(num_fact_checkers)}\n"
+            f"🟣 Moderators     : {int(num_moderators)}\n"
+            f"🔵 Normal Users   : {max(0, normal_count)}"
         )
 
         if os.path.exists(path):
@@ -64,14 +78,16 @@ def preview_network(num_nodes, edges_per_node, spread_prob, amplification):
 
 
 
-def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
+def run_simulation(num_nodes, edges_per_node, spread_prob, amplification,
+                    num_influencers, num_fact_checkers, num_moderators):
     
     empty_table = [["—", "—", "—", "—"]]
     empty_node_table = [["—", "—", "—", "—"]]
     empty = ("", "", "", "", "", "", "", None, None, "", empty_table, empty_node_table)
 
     try:
-        pipe = initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification)
+        pipe = initialize_pipeline(num_nodes, edges_per_node, spread_prob, amplification,
+                                    num_influencers, num_fact_checkers, num_moderators)
         result = pipe.run_simulation()
 
         # Analytics
@@ -98,7 +114,7 @@ def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
         spread_output = (
             f"📡 Neutral Agent — BFS Spread\n{'─'*50}\n"
             f"Nodes Infected    : {spread.get('total_spread', 0)} / {spread.get('total_nodes', 0)}\n"
-            f"Penetration Rate  : {spread.get('penetration_rate', 0)}%\n"
+            f"Penetration Rate  : {int(round(spread.get('penetration_rate', 0)))}%\n"
             f"Max Spread Depth  : {spread.get('max_depth', 0)} hops\n"
             f"Normal Users Hit  : {spread.get('normal_users_infected', 0)}\n"
         )
@@ -109,7 +125,7 @@ def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
             f"📣 Influencer Agent — Amplification\n{'─'*50}\n"
             f"Active Influencers : {influence.get('active_influencers', 0)}\n"
             f"Additional Spread  : {influence.get('additional_spread', 0)} nodes\n"
-            f"Amplification Score: {influence.get('amplification_score', 0)}/10\n\n"
+            f"Amplification Score: {int(round(influence.get('amplification_score', 0)))}/10\n\n"
             f"✍️ Modified Claim:\n{influence.get('modified_claim', 'N/A')[:200]}\n"
         )
 
@@ -121,6 +137,8 @@ def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
             f"{emoji} Verdict    : {fc.get('verdict', 'N/A')}\n"
             f"📊 Confidence : {fc.get('confidence', 0)*100:.0f}%\n"
             f"📝 Evidence   : {fc.get('evidence', 'N/A')[:200]}\n"
+            f"🌐 Search Engine: {fc.get('search_provider', 'duckduckgo')}\n"
+            f"🔎 Search Note  : {fc.get('search_summary', 'No web-search summary available.')}\n"
             f"📋 Nodes Checked: {fc.get('nodes_checked', 0)}\n"
             f"⚠️ Nodes Warned : {fc.get('nodes_warned', 0)}\n"
             f"🔍 Active Checkers: {fc.get('active_checkers', 0)} / {fc.get('total_fact_checkers', 0)}\n"
@@ -128,6 +146,19 @@ def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
         flags = fc.get("red_flags", [])
         if flags:
             fc_output += f"\n🚩 Red Flags:\n" + "\n".join(f"  • {f}" for f in flags)
+
+        sources = fc.get("search_sources", [])
+        if sources:
+            fc_output += "\n\n📚 Sources Checked:\n"
+            for idx, src in enumerate(sources[:5], start=1):
+                title = src.get("title", "Untitled")
+                url = src.get("url", "N/A")
+                snippet = src.get("snippet", "")[:140]
+                fc_output += (
+                    f"  {idx}. {title}\n"
+                    f"     Website: {url}\n"
+                    f"     Found: {snippet}\n"
+                )
 
         # ── Moderation output ─────────────────────────────────────
         mod = result.get("moderation_result", {})
@@ -147,7 +178,7 @@ def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
 
         # ── Pipeline log ──────────────────────────────────────────
         log = "\n".join(result.get("pipeline_log", []))
-        log += f"\n\n⏱️ Total Time: {result.get('elapsed_time', 0):.1f}s"
+        log += f"\n\n⏱️ Total Time: {int(round(result.get('elapsed_time', 0)))}s"
 
         # ── Analytics report ──────────────────────────────────────
         analytics_report = analytics_engine.generate_analytics_report(result)
@@ -194,16 +225,66 @@ def run_simulation(num_nodes, edges_per_node, spread_prob, amplification):
 # ─── Build the Gradio Interface ──────────────────────────────────────────────
 
 CUSTOM_CSS = """
-.gradio-container { max-width: 1500px !important; }
+:root {
+    --ink: #102a43;
+    --paper: #f7f6f2;
+    --accent: #ff7a18;
+    --accent-2: #0f766e;
+    --card: #fffdf7;
+}
+
+body {
+    background: radial-gradient(circle at 20% 10%, #ffe8cc 0, #f7f6f2 40%, #e6f4ea 100%) !important;
+}
+
+.gradio-container {
+    max-width: 1500px !important;
+}
+
+.block {
+    border: 1px solid #eadfcf !important;
+    background: var(--card) !important;
+    border-radius: 16px !important;
+    box-shadow: 0 10px 30px rgba(16, 42, 67, 0.07) !important;
+}
+
+button.primary {
+    background: linear-gradient(90deg, var(--accent), #ffb347) !important;
+    border: none !important;
+    color: #1a1205 !important;
+    font-weight: 700 !important;
+}
+
+button.secondary {
+    background: linear-gradient(90deg, #d1fae5, #a7f3d0) !important;
+    border: 1px solid #67e8f9 !important;
+    color: #083344 !important;
+    font-weight: 700 !important;
+}
+
+.tabs button {
+    border-radius: 999px !important;
+}
 """
 
 GRADIO_THEME = gr.themes.Soft(
-    primary_hue="blue", secondary_hue="purple", neutral_hue="slate",
+        primary_hue="amber", secondary_hue="emerald", neutral_hue="stone",
 )
 
 
+def update_agent_defaults(num_nodes):
+    """Called when node-count slider changes — returns recommended agent counts."""
+    defaults = calculate_agent_counts(int(num_nodes))
+    return (
+        gr.update(value=defaults["num_influencers"]),
+        gr.update(value=defaults["num_fact_checkers"]),
+        gr.update(value=defaults["num_moderators"]),
+    )
+
 def create_ui():
     """Create and return the Gradio Blocks app."""
+
+    defaults = calculate_agent_counts(NETWORK_NUM_NODES)
 
     with gr.Blocks(
         title="Multi-Agent Misinformation Simulation",
@@ -242,14 +323,38 @@ def create_ui():
 
                         gr.Markdown("### 📡 Propagation Settings")
                         spread_prob_slider = gr.Slider(
-                            minimum=0.05, maximum=0.90, value=SPREAD_PROBABILITY, step=0.05,
-                            label="Base Spread Probability",
-                            info="Chance a normal user reshares",
+                            minimum=5, maximum=90, value=int(SPREAD_PROBABILITY * 100), step=5,
+                            label="Base Spread Probability (%)",
+                            info="Integer percentage chance a normal user reshares",
                         )
                         amplification_slider = gr.Slider(
-                            minimum=1.0, maximum=5.0, value=AMPLIFICATION_FACTOR, step=0.5,
+                            minimum=1, maximum=5, value=int(AMPLIFICATION_FACTOR), step=1,
                             label="Influencer Amplification Factor",
-                            info="Multiplier on neighbour fan-out",
+                            info="Integer multiplier on neighbour fan-out",
+                        )
+
+                        gr.Markdown("### 🤖 Agent Configuration")
+                        gr.Markdown(
+                            "*Defaults are auto-calculated when you change the node count. "
+                            "Feel free to override them.*"
+                        )
+                        influencer_slider = gr.Slider(
+                            minimum=1, maximum=50,
+                            value=defaults["num_influencers"], step=1,
+                            label="🟠 Number of Influencer Agents",
+                            info="High-degree nodes that amplify claims",
+                        )
+                        fact_checker_slider = gr.Slider(
+                            minimum=1, maximum=50,
+                            value=defaults["num_fact_checkers"], step=1,
+                            label="🟢 Number of Fact-Checker Agents",
+                            info="Nodes that verify and warn neighbours",
+                        )
+                        moderator_slider = gr.Slider(
+                            minimum=1, maximum=50,
+                            value=defaults["num_moderators"], step=1,
+                            label="🟣 Number of Moderator Agents",
+                            info="Content gatekeepers that block/flag",
                         )
 
                         with gr.Row():
@@ -379,7 +484,15 @@ Python · NetworkX (Barabási-Albert) · LangGraph · Groq (LLaMA 3.3 70B)
         all_inputs = [
             num_nodes_slider, edges_slider,
             spread_prob_slider, amplification_slider,
+            influencer_slider, fact_checker_slider, moderator_slider,
         ]
+
+        # ─── Auto-update agent sliders when node count changes ───────
+        num_nodes_slider.change(
+            fn=update_agent_defaults,
+            inputs=[num_nodes_slider],
+            outputs=[influencer_slider, fact_checker_slider, moderator_slider],
+        )
 
         # ─── Event Handlers ──────────────────────────────────────────
         preview_btn.click(

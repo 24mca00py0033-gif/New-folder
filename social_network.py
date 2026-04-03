@@ -28,17 +28,43 @@ class SocialNetwork:
         num_nodes=NETWORK_NUM_NODES,
         edges_per_node=NETWORK_EDGES_PER_NODE,
         seed=NETWORK_SEED,
+        num_influencers=None,
+        num_fact_checkers=None,
+        num_moderators=None,
     ):
         self.num_nodes = int(num_nodes)
         self.edges_per_node = int(edges_per_node)
         self.seed = seed
 
-        
         agent_counts = calculate_agent_counts(self.num_nodes)
         self.num_misinfo = agent_counts["num_misinfo"]
-        self.num_influencers = agent_counts["num_influencers"]
-        self.num_fact_checkers = agent_counts["num_fact_checkers"]
-        self.num_moderators = agent_counts["num_moderators"]
+
+        # Keep role counts valid even when custom sliders are used.
+        default_influencers = agent_counts["num_influencers"]
+        default_fact_checkers = agent_counts["num_fact_checkers"]
+        default_moderators = agent_counts["num_moderators"]
+
+        self.num_influencers = max(0, int(num_influencers if num_influencers is not None else default_influencers))
+        self.num_fact_checkers = max(0, int(num_fact_checkers if num_fact_checkers is not None else default_fact_checkers))
+        self.num_moderators = max(0, int(num_moderators if num_moderators is not None else default_moderators))
+
+        role_capacity = max(0, self.num_nodes - self.num_misinfo)
+        total_roles = self.num_influencers + self.num_fact_checkers + self.num_moderators
+        if total_roles > role_capacity and total_roles > 0:
+            scale = role_capacity / total_roles
+            self.num_influencers = int(self.num_influencers * scale)
+            self.num_fact_checkers = int(self.num_fact_checkers * scale)
+            self.num_moderators = int(self.num_moderators * scale)
+
+            # Fill any remainder deterministically by priority.
+            remainder = role_capacity - (
+                self.num_influencers + self.num_fact_checkers + self.num_moderators
+            )
+            for role_name in ("num_moderators", "num_fact_checkers", "num_influencers"):
+                if remainder <= 0:
+                    break
+                setattr(self, role_name, getattr(self, role_name) + 1)
+                remainder -= 1
 
         self.graph = self._create_graph()
         self._assign_roles()
@@ -172,11 +198,11 @@ class SocialNetwork:
         clean = status_counts.get("clean", 0)
 
         return [
-            ["🔴 Nodes Spread (Infected)", infected, f"{infected/total*100:.1f}%"],
-            ["🟠 Nodes Influenced", influenced, f"{influenced/total*100:.1f}%"],
-            ["⚠️ Nodes Warned (Fact-Checked)", warned, f"{warned/total*100:.1f}%"],
-            ["🚫 Nodes Blocked (Moderated)", blocked, f"{blocked/total*100:.1f}%"],
-            ["🟢 Nodes Uninformed (Clean)", clean, f"{clean/total*100:.1f}%"],
+            ["🔴 Nodes Spread (Infected)", infected, f"{int(round(infected/max(total,1)*100))}%"],
+            ["🟠 Nodes Influenced", influenced, f"{int(round(influenced/max(total,1)*100))}%"],
+            ["⚠️ Nodes Warned (Fact-Checked)", warned, f"{int(round(warned/max(total,1)*100))}%"],
+            ["🚫 Nodes Blocked (Moderated)", blocked, f"{int(round(blocked/max(total,1)*100))}%"],
+            ["🟢 Nodes Uninformed (Clean)", clean, f"{int(round(clean/max(total,1)*100))}%"],
             ["📊 Total Nodes", total, "100%"],
         ]
 
@@ -392,5 +418,15 @@ def create_network(
     num_nodes=NETWORK_NUM_NODES,
     edges_per_node=NETWORK_EDGES_PER_NODE,
     seed=NETWORK_SEED,
+    num_influencers=None,
+    num_fact_checkers=None,
+    num_moderators=None,
 ) -> SocialNetwork:
-    return SocialNetwork(num_nodes, edges_per_node, seed)
+    return SocialNetwork(
+        num_nodes,
+        edges_per_node,
+        seed,
+        num_influencers=num_influencers,
+        num_fact_checkers=num_fact_checkers,
+        num_moderators=num_moderators,
+    )

@@ -16,10 +16,10 @@ class SimulationAnalytics:
         return {
             "total_spread": total_spread,
             "total_nodes": total_nodes,
-            "penetration_rate": round(total_spread / max(total_nodes, 1) * 100, 2),
+            "penetration_rate": int(round(total_spread / max(total_nodes, 1) * 100)),
             "spread_per_step": steps,
             "cumulative_spread": cumulative,
-            "avg_velocity": round(float(np.mean(steps)), 2) if steps else 0,
+            "avg_velocity": int(round(float(np.mean(steps)))) if steps else 0,
             "peak_step": (int(np.argmax(steps)) + 1) if steps else 0,
             "peak_spread_count": int(max(steps)) if steps else 0,
             "max_depth": spread.get("max_depth", 0),
@@ -62,15 +62,15 @@ class SimulationAnalytics:
         total = self.network.num_nodes
         return [
             ["Nodes Didn't Get Info", sc.get("clean", 0),
-             f"{sc.get('clean', 0)/total*100:.1f}%", "Did not receive the claim"],
+               f"{int(round(sc.get('clean', 0)/max(total,1)*100))}%", "Did not receive the claim"],
             ["Nodes Spread", sc.get("infected", 0),
-             f"{sc.get('infected', 0)/total*100:.1f}%", "Received and shared the claim"],
+               f"{int(round(sc.get('infected', 0)/max(total,1)*100))}%", "Received and shared the claim"],
             ["Nodes Influenced", sc.get("influenced", 0),
-             f"{sc.get('influenced', 0)/total*100:.1f}%", "Received modified claim from influencers"],
+               f"{int(round(sc.get('influenced', 0)/max(total,1)*100))}%", "Received modified claim from influencers"],
             ["Nodes Checked the Info", sc.get("warned", 0),
-             f"{sc.get('warned', 0)/total*100:.1f}%", "Fact-checked and warned"],
+               f"{int(round(sc.get('warned', 0)/max(total,1)*100))}%", "Fact-checked and warned"],
             ["Nodes Blocked", sc.get("blocked", 0),
-             f"{sc.get('blocked', 0)/total*100:.1f}%", "Blocked by moderators"],
+               f"{int(round(sc.get('blocked', 0)/max(total,1)*100))}%", "Blocked by moderators"],
         ]
 
     def generate_full_analytics(self, state: dict) -> dict:
@@ -88,7 +88,7 @@ class SimulationAnalytics:
         mod = state.get("moderation_result", {})
 
         steps = spread.get("spread_per_step", [])
-        avg_vel = round(float(np.mean(steps)), 2) if steps else 0
+        avg_vel = int(round(float(np.mean(steps)))) if steps else 0
         peak = (int(np.argmax(steps)) + 1) if steps else 0
 
         sc = mod.get("final_status_counts", {})
@@ -131,10 +131,10 @@ class SimulationAnalytics:
 
 📊 5. FINAL NODE STATUS
 {'─'*60}
-   Clean (Uninformed)    : {sc.get('clean', 0)} ({sc.get('clean', 0)/max(total,1)*100:.1f}%)
-   Infected              : {sc.get('infected', 0)} ({sc.get('infected', 0)/max(total,1)*100:.1f}%)
-   Influenced            : {sc.get('influenced', 0)} ({sc.get('influenced', 0)/max(total,1)*100:.1f}%)
-   Warned                : {sc.get('warned', 0)} ({sc.get('warned', 0)/max(total,1)*100:.1f}%)
-   Blocked               : {sc.get('blocked', 0)} ({sc.get('blocked', 0)/max(total,1)*100:.1f}%)
+    Clean (Uninformed)    : {sc.get('clean', 0)} ({int(round(sc.get('clean', 0)/max(total,1)*100))}%)
+    Infected              : {sc.get('infected', 0)} ({int(round(sc.get('infected', 0)/max(total,1)*100))}%)
+    Influenced            : {sc.get('influenced', 0)} ({int(round(sc.get('influenced', 0)/max(total,1)*100))}%)
+    Warned                : {sc.get('warned', 0)} ({int(round(sc.get('warned', 0)/max(total,1)*100))}%)
+    Blocked               : {sc.get('blocked', 0)} ({int(round(sc.get('blocked', 0)/max(total,1)*100))}%)
 
 {'='*60}"""
